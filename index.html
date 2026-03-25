@@ -1397,10 +1397,13 @@ function loadDashboard() {
   // ── GRÁFICO DONUT DE CATEGORÍAS ──────────────────
   drawDashboardChart(byCategory);
 
-  // Limpiar tablas antiguas
-  document.getElementById('dashIngresosPorAno').innerHTML = '';
-  document.getElementById('dashGastosPorAno').innerHTML = '';
-  document.getElementById('dashMargenPorAno').innerHTML = '';
+  // Limpiar tablas antiguas (si existen)
+  const dashIngresos = document.getElementById('dashIngresosPorAno');
+  if (dashIngresos) dashIngresos.innerHTML = '';
+  const dashGastos = document.getElementById('dashGastosPorAno');
+  if (dashGastos) dashGastos.innerHTML = '';
+  const dashMargen = document.getElementById('dashMargenPorAno');
+  if (dashMargen) dashMargen.innerHTML = '';
 }
 
 function drawDashboardChart(byCategory) {
