@@ -2476,6 +2476,13 @@ async function initPresupuestos() {
       });
       pptoLoaded = true;
       console.log('Presupuestos cargados:', allBudgets.length, 'registros');
+      // DEBUG: muestra muestra de datos con feria
+      const conFeria = allBudgets.filter(b => b.feria).length;
+      const sinFeria = allBudgets.filter(b => !b.feria).length;
+      console.log('📊 Con feria:', conFeria, '| Sin feria:', sinFeria);
+      if (allBudgets.length > 0) {
+        console.log('🔍 Muestra:', allBudgets[0]);
+      }
     } catch (e) {
       console.error('Error cargando presupuestos:', e);
     }
@@ -2524,10 +2531,12 @@ function renderPptoIniciales(filtered) {
 
 function buildPptoMatrixSelects() {
   const ferias = [...new Set(allBudgets.map(b => b.feria).filter(Boolean))].sort();
+  console.log('🏢 Ferias encontradas:', ferias, 'de', allBudgets.length, 'presupuestos');
   const feriaSelect = document.getElementById('pptoMatrixFeria');
   feriaSelect.innerHTML = '<option value="">Selecciona...</option>' + ferias.map(f => `<option value="${f}">${f}</option>`).join('');
 
   const clientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
+  console.log('👥 Clientes encontrados:', clientes);
   const clienteSelect = document.getElementById('pptoMatrixCliente');
   clienteSelect.innerHTML = '<option value="">Selecciona...</option>' + clientes.map(c => `<option value="${c}">${c}</option>`).join('');
 }
