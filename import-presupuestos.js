@@ -1093,7 +1093,7 @@ async function importPresupuestos() {
     importBtn.disabled = true;
 
     // Recargar datos
-    loadPresupuestos();
+    initPresupuestos();
 
   } catch (err) {
     console.error('Error en importación:', err);
