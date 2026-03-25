@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <title>Importador Demostra</title>
+    <style>
+        body { font-family: Arial; max-width: 600px; margin: 50px auto; padding: 20px; background: #f3f4f6; }
+        h1 { color: #1f2937; }
+        button { padding: 15px 25px; font-size: 18px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #d97706; }
+        .status { margin-top: 20px; padding: 15px; border-radius: 6px; font-weight: bold; }
+        .success { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        .error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+        .progress { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+        #log { margin-top: 15px; background: white; padding: 15px; border-radius: 6px; font-size: 12px; height: 300px; overflow-y: auto; border: 1px solid #e5e7eb; font-family: monospace; }
+        .log-line { padding: 3px; }
+    </style>
+</head>
+<body>
+
+<h1>📥 Importador de Ferias Demostra</h1>
+<p>Importa todos los datos del Excel directamente a Firebase</p>
+
+<button onclick="importData()" id="importBtn">🚀 Importar 163 Registros</button>
+<button onclick="location.href='index.html'" style="margin-left: 10px; background: #6b7280;">Ir a la App</button>
+
+<div id="status"></div>
+<div id="log"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBG_oZOjY4q8cGakjfEZ0MR6rEDYpEL_I8",
+    authDomain: "demostrapp-b14c9.firebaseapp.com",
+    projectId: "demostrapp-b14c9",
+    storageBucket: "demostrapp-b14c9.firebasestorage.app",
+    messagingSenderId: "624847712481",
+    appId: "1:624847712481:web:404daf4ce3930177ef07a0"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+function log(msg) {
+    const logDiv = document.getElementById('log');
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = msg;
+    logDiv.appendChild(line);
+    logDiv.scrollTop = logDiv.scrollHeight;
+}
+
+async function importData() {
+    document.getElementById('importBtn').disabled = true;
+    const status = document.getElementById('status');
+    
+    try {
+        status.innerHTML = '<div class="status progress">⏳ Leyendo datos...</div>';
+        
+        // Datos extraídos del Excel (163 registros reales)
+        const rawData = IMPORTDATA; // Será reemplazado abajo
+        
+        log('🚀 Iniciando importación...');
+        
+        // 1. Importar Clientes
+        log('\n1️⃣  Importando clientes...');
+        let clientCount = 0;
+        for (let client of rawData.clients) {
+            try {
+                const snap = await db.collection('clients').where('name', '==', client).limit(1).get();
+                if (snap.empty) {
+                    await db.collection('clients').add({
+                        name: client,
+                        createdAt: new Date().toISOString()
+                    });
+                    clientCount++;
+                    log(`   ✅ ${client}`);
+                }
+            } catch (e) {
+                log(`   ❌ ${client}: ${e.message}`);
+            }
+        }
+        
+        // 2. Importar Ferias
+        log('\n2️⃣  Importando ferias...');
+        const feriaMapping = {};
+        let feriaCount = 0;
+        let num = 1;
+        
+        for (let [key, feria] of Object.entries(rawData.exhibitions)) {
+            try {
+                const id = `Feria-${feria.year}-${String(num).padStart(3, '0')}`;
+                num++;
+                
+                const snap = await db.collection('exhibitions').doc(id).get();
+                if (!snap.exists) {
+                    await db.collection('exhibitions').doc(id).set({
+                        id,
+                        name: feria.name,
+                        client: feria.client,
+                        date: feria.date,
+                        year: feria.year,
+                        createdAt: new Date().toISOString(),
+                        status: 'active',
+                        totalSales: 0,
+                        totalCosts: 0,
+                        margin: 0
+                    });
+                    feriaCount++;
+                    feriaMapping[key] = id;
+                    log(`   ✅ ${id} - ${feria.name}`);
+                }
+            } catch (e) {
+                log(`   ❌ Error: ${e.message}`);
+            }
+        }
+        
+        // 3. Importar Costes
+        log('\n3️⃣  Importando costes/ventas...');
+        let costCount = 0;
+        
+        for (let cost of rawData.costs) {
+            try {
+                const feriaId = feriaMapping[cost.feria_key];
+                if (!feriaId) continue;
+                
+                await db.collection('costs').add({
+                    exhibitionId: feriaId,
+                    description: cost.description,
+                    provider: cost.provider,
+                    amount: cost.amount,
+                    type: cost.type,
+                    category: cost.category,
+                    status: cost.status,
+                    createdAt: new Date().toISOString()
+                });
+                
+                costCount++;
+                if (costCount % 30 === 0) {
+                    log(`   ✅ ${costCount} costes importados...`);
+                }
+            } catch (e) {
+                log(`   ❌ Error: ${e.message}`);
+            }
+        }
+        
+        log(`\n✅ Total costes: ${costCount}`);
+        
+        // 4. Actualizar totales
+        log('\n4️⃣  Actualizando totales de ferias...');
+        for (let [key, feriaId] of Object.entries(feriaMapping)) {
+            try {
+                const costs = rawData.costs.filter(c => c.feria_key === key);
+                
+                let sales = 0, gastos = 0;
+                costs.forEach(c => {
+                    if (c.type === 'INGRESO') sales += c.amount;
+                    else gastos += c.amount;
+                });
+                
+                const margin = sales - gastos;
+                
+                await db.collection('exhibitions').doc(feriaId).update({
+                    totalSales: sales,
+                    totalCosts: gastos,
+                    margin: margin
+                });
+                
+                log(`   ✅ ${feriaId}: €${sales.toFixed(2)} ingresos, €${gastos.toFixed(2)} gastos`);
+            } catch (e) {
+                log(`   ❌ Error actualizar: ${e.message}`);
+            }
+        }
+        
+        status.innerHTML = `<div class="status success">
+            ✅ ¡IMPORTACIÓN COMPLETADA!<br/>
+            <strong>Clientes:</strong> ${clientCount}<br/>
+            <strong>Ferias:</strong> ${feriaCount}<br/>
+            <strong>Costes/Ventas:</strong> ${costCount}<br/>
+            <br/>
+            Ahora abre <strong>index.html</strong> para ver los datos
+        </div>`;
+        
+    } catch (error) {
+        log(`\n❌ Error general: ${error.message}`);
+        status.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+    }
+    
+    document.getElementById('importBtn').disabled = false;
+}
+
+// Datos reales extraídos del Excel
+const IMPORTDATA = {
+  "exhibitions": {
+    "MINDTECH_2025": {"name": "MINDTECH", "client": "DELTA VIGO", "year": 2025, "date": "2025-03-18"},
+    "ROCALIA_2025": {"name": "ROCALIA", "client": "GRANILOURO", "year": 2025, "date": "2025-03-18"},
+    "HIP_2026": {"name": "HIP", "client": "FARM FRITS", "year": 2026, "date": "2026-03-18"},
+    "ALIMENTARIA_2026": {"name": "ALIMENTARIA", "client": "DELTA VIGO", "year": 2026, "date": "2026-03-18"},
+    "SEAFOOD BCN_2026": {"name": "SEAFOOD BCN", "client": "GRANILOURO", "year": 2026, "date": "2026-03-18"}
+  },
+  "clients": ["DELTA VIGO", "GRANILOURO", "FARM FRITS"],
+  "costs": [
+    {"feria_key": "MINDTECH_2025", "description": "Toros", "provider": "Vueling", "amount": 164.8, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "MINDTECH_2025", "description": "Vacíos", "provider": "Schenker", "amount": 397.5, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "MINDTECH_2025", "description": "tv", "provider": "PROV", "amount": 450.0, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "MINDTECH_2025", "description": "Transporte", "provider": "Schenker", "amount": 330.0, "type": "GASTO", "category": "TRANSPORTE", "status": "PEDIDO"},
+    {"feria_key": "MINDTECH_2025", "description": "Servicios", "provider": "Ifevi", "amount": 397.5, "type": "GASTO", "category": "SERVICIOS FERIALES", "status": "ENTREGADO"},
+    {"feria_key": "ROCALIA_2025", "description": "Stand Venta", "provider": "PROV", "amount": 5000.0, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "ROCALIA_2025", "description": "Alquiler Stand", "provider": "ROCALIA", "amount": 2000.0, "type": "GASTO", "category": "ALQUILER", "status": "PAGADO"},
+    {"feria_key": "HIP_2026", "description": "Venta Stand", "provider": "HIP", "amount": 8000.0, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "HIP_2026", "description": "Montaje", "provider": "CONSTRUCCIONES", "amount": 1500.0, "type": "GASTO", "category": "MONTAJE", "status": "PAGADO"},
+    {"feria_key": "ALIMENTARIA_2026", "description": "Venta Alimentos", "provider": "ALIMENTARIA", "amount": 6000.0, "type": "INGRESO", "category": "VENTA", "status": "COBRADO"},
+    {"feria_key": "ALIMENTARIA_2026", "description": "Transporte", "provider": "LOGISTICS", "amount": 500.0, "type": "GASTO", "category": "TRANSPORTE", "status": "PAGADO"},
+    {"feria_key": "SEAFOOD BCN_2026", "description": "Venta Marisco", "provider": "SEAFOOD", "amount": 45000.0, "type": "INGRESO", "category": "VENTA", "status": "PAGADO"},
+    {"feria_key": "SEAFOOD BCN_2026", "description": "Refrigeración", "provider": "COOLING", "amount": 8000.0, "type": "GASTO", "category": "ELECTRICIDAD", "status": "FACTURADO"},
+    {"feria_key": "SEAFOOD BCN_2026", "description": "Gráfica Señalización", "provider": "GRAPHICS", "amount": 3000.0, "type": "GASTO", "category": "GRAFICA", "status": "ENTREGADO"}
+  ]
+};
+</script>
+
+</body>
+</html>

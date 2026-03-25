@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Demostra - Gestor de Ferias</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#d4af37",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0a0c10",
+                        "card-dark": "#161b22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .gold-gradient {
+            background: linear-gradient(135deg, #d4af37 0%, #f1d592 100%);
+        }
+        .progress-ring {
+            transition: stroke-dashoffset 0.35s;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .tab-btn.active {
+            @apply border-primary text-primary;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active {
+            display: flex;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+    <!-- TopNavBar -->
+    <header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-3 bg-background-light dark:bg-background-dark sticky top-0 z-50">
+        <div class="flex items-center gap-4">
+            <div class="size-8 text-primary">
+                <svg fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M24 4H42V17.3333V30.6667H24V44H6V30.6667V17.3333H24V4Z" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Demostra <span class="text-primary">Ferias</span></h2>
+        </div>
+        <div class="flex flex-1 justify-end gap-4 items-center">
+            <div class="flex gap-2">
+                <button onclick="exportData()" class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">download</span>
+                </button>
+                <button class="flex items-center justify-center rounded-lg h-10 w-10 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-primary/20 hover:text-primary transition-colors">
+                    <span class="material-symbols-outlined">account_circle</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1">
+        <!-- Sidebar -->
+        <aside class="w-64 border-r border-slate-200 dark:border-slate-800 hidden lg:flex flex-col p-4 gap-6 bg-background-light dark:bg-background-dark">
+            <div class="flex flex-col gap-1">
+                <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 mb-2">Principal</p>
+                <button onclick="switchTab('dashboard')" class="tab-btn flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full active:bg-primary/10 active:text-primary">
+                    <span class="material-symbols-outlined">dashboard</span>
+                    <span class="text-sm font-medium">Dashboard</span>
+                </button>
+                <button onclick="switchTab('exhibitions')" class="tab-btn flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full">
+                    <span class="material-symbols-outlined">event</span>
+                    <span class="text-sm font-medium">Ferias</span>
+                </button>
+                <button onclick="switchTab('costs')" class="tab-btn flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full">
+                    <span class="material-symbols-outlined">receipt</span>
+                    <span class="text-sm font-medium">Costes</span>
+                </button>
+                <button onclick="switchTab('analysis')" class="tab-btn flex items-center gap-3 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors w-full">
+                    <span class="material-symbols-outlined">bar_chart</span>
+                    <span class="text-sm font-medium">Análisis</span>
+                </button>
+            </div>
+            <div class="mt-auto p-4 rounded-xl bg-primary/5 border border-primary/10">
+                <p class="text-xs font-bold text-primary mb-1">GESTIÓN DE FERIAS</p>
+                <p class="text-xs text-slate-500 mb-3">Control total de presupuestos y costes en tiempo real.</p>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-6 lg:p-10 overflow-y-auto">
+            <div class="max-w-7xl mx-auto">
+
+                <!-- DASHBOARD TAB -->
+                <div id="dashboard" class="tab-content">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Dashboard de Ferias</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1">Seguimiento de presupuestos y costes en tiempo real.</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <input type="text" id="filterExhibition" placeholder="Filtrar ferias..." class="px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm" onkeyup="updateDashboard()">
+                            <button onclick="exportData()" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-800 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">download</span> Exportar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Quick Stats -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+                        <div id="statCard1" class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-2 bg-primary/20 rounded-lg">
+                                    <span class="material-symbols-outlined text-primary">attach_money</span>
+                                </div>
+                                <span id="stat1Trend" class="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">+0%</span>
+                            </div>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Facturación Total</p>
+                            <p id="stat1Value" class="text-3xl font-black text-slate-900 dark:text-slate-100 mt-1">€0</p>
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-4">
+                                <div id="stat1Bar" class="gold-gradient h-full rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div id="statCard2" class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-2 bg-primary/20 rounded-lg">
+                                    <span class="material-symbols-outlined text-primary">shopping_cart</span>
+                                </div>
+                                <span id="stat2Trend" class="text-xs font-bold text-rose-500 bg-rose-500/10 px-2 py-1 rounded-full">-0%</span>
+                            </div>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Gastos Reales</p>
+                            <p id="stat2Value" class="text-3xl font-black text-slate-900 dark:text-slate-100 mt-1">€0</p>
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-4">
+                                <div id="stat2Bar" class="gold-gradient h-full rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        <div id="statCard3" class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div class="flex justify-between items-start mb-4">
+                                <div class="p-2 bg-primary/20 rounded-lg">
+                                    <span class="material-symbols-outlined text-primary">trending_up</span>
+                                </div>
+                                <span id="stat3Trend" class="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-full">+0%</span>
+                            </div>
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Margen Promedio</p>
+                            <p id="stat3Value" class="text-3xl font-black text-slate-900 dark:text-slate-100 mt-1">0%</p>
+                            <div class="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full mt-4">
+                                <div id="stat3Bar" class="gold-gradient h-full rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Strategic Progress -->
+                    <h2 class="text-xl font-bold mb-6 flex items-center gap-2">
+                        <span class="w-2 h-6 bg-primary rounded-full"></span>
+                        Ferias Principales
+                    </h2>
+
+                    <div id="dashboardGrid" class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                        <!-- Cards se generan con JS -->
+                    </div>
+                </div>
+
+                <!-- EXHIBITIONS TAB -->
+                <div id="exhibitions" class="tab-content hidden">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Gestión de Ferias</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1">Crear y editar ferias con presupuestos.</p>
+                        </div>
+                        <button onclick="openNewExhibitionModal()" class="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-background-dark text-sm font-bold hover:brightness-110 shadow-lg shadow-primary/20 transition-all">
+                            <span class="material-symbols-outlined text-[20px]">add</span> Nueva Feria
+                        </button>
+                    </div>
+                    <div id="exhibitionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <!-- Cards se generan con JS -->
+                    </div>
+                </div>
+
+                <!-- COSTS TAB -->
+                <div id="costs" class="tab-content hidden">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Seguimiento de Costes</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1">Registra y visualiza costes reales por feria.</p>
+                        </div>
+                        <button onclick="openNewCostModal()" class="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-background-dark text-sm font-bold hover:brightness-110 shadow-lg shadow-primary/20 transition-all">
+                            <span class="material-symbols-outlined text-[20px]">add</span> Nuevo Coste
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Costes</p>
+                            <p id="totalCostsValue" class="text-2xl font-black text-slate-900 dark:text-slate-100 mt-2">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Gastos GG (7%)</p>
+                            <p id="ggValue" class="text-2xl font-black text-primary mt-2">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Imprevistos (3%)</p>
+                            <p id="imprevistoValue" class="text-2xl font-black text-primary mt-2">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <label class="text-slate-500 dark:text-slate-400 text-sm font-medium block mb-2">Seleccionar Feria</label>
+                            <select id="exhibitionSelect" onchange="updateCostsTab()" class="w-full px-3 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm border border-slate-300 dark:border-slate-600">
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Detalle de Costes</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="border-b border-slate-200 dark:border-slate-700">
+                                        <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Feria</th>
+                                        <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Categoría</th>
+                                        <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Tipo</th>
+                                        <th class="text-right py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Importe</th>
+                                        <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Fecha</th>
+                                        <th class="text-center py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="costsTableBody">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ANALYSIS TAB -->
+                <div id="analysis" class="tab-content hidden">
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                        <div>
+                            <h1 class="text-3xl font-black tracking-tight text-slate-900 dark:text-slate-100">Análisis de Desviaciones</h1>
+                            <p class="text-slate-500 dark:text-slate-400 mt-1">Comparativa presupuestado vs real por feria.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Comparativa por Categoría</h3>
+                            <canvas id="analysisChart" style="max-height: 300px;"></canvas>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800">
+                            <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-6">Margen por Feria</h3>
+                            <canvas id="marginChart" style="max-height: 300px;"></canvas>
+                        </div>
+                    </div>
+
+                    <div id="analysisDetail" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- MODALS -->
+<div id="newExhibitionModal" class="modal">
+    <div class="modal-content bg-background-light dark:bg-card-dark rounded-2xl p-8 w-96">
+        <div class="modal-header text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Nueva Feria</div>
+        <form onsubmit="saveNewExhibition(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nombre</label>
+                    <input type="text" id="newExhName" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Cliente</label>
+                    <input type="text" id="newExhClient" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Ubicación</label>
+                    <input type="text" id="newExhLocation" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Stands</label>
+                    <input type="number" id="newExhStands" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Venta Presupuesto (€)</label>
+                    <input type="number" id="newExhSale" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Coste Presupuesto (€)</label>
+                    <input type="number" id="newExhCost" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6 justify-end">
+                <button type="button" onclick="closeModal('newExhibitionModal')" class="px-6 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                <button type="submit" class="px-6 py-2 rounded-lg bg-primary text-background-dark text-sm font-bold hover:brightness-110">Crear</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div id="newCostModal" class="modal">
+    <div class="modal-content bg-background-light dark:bg-card-dark rounded-2xl p-8 w-96">
+        <div class="modal-header text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Nuevo Coste</div>
+        <form onsubmit="saveNewCost(event)">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Feria</label>
+                    <select id="newCostExhId" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Categoría</label>
+                    <select id="newCostCategory" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                        <option value="CARPINTERIA">CARPINTERIA</option>
+                        <option value="MONTAJE">MONTAJE</option>
+                        <option value="ELECTRICIDAD">ELECTRICIDAD</option>
+                        <option value="GASTOS VIAJE">GASTOS VIAJE</option>
+                        <option value="GRAFICA">GRAFICA</option>
+                        <option value="MATERIAL">MATERIAL</option>
+                        <option value="TRANSPORTE">TRANSPORTE</option>
+                        <option value="SERVICIOS FERIALES">SERVICIOS FERIALES</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Importe (€)</label>
+                    <input type="number" id="newCostAmount" step="0.01" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo</label>
+                    <select id="newCostType" class="w-full px-4 py-2 rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" required>
+                        <option value="GASTO">Gasto</option>
+                        <option value="VENTAS">Venta</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6 justify-end">
+                <button type="button" onclick="closeModal('newCostModal')" class="px-6 py-2 rounded-lg border border-slate-200 dark:border-slate-700 text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                <button type="submit" class="px-6 py-2 rounded-lg bg-primary text-background-dark text-sm font-bold hover:brightness-110">Añadir</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    let exhibitions = [
+        { id: 1, name: 'HIP 2026', location: 'MD', client: 'FARM FRITS', year: 2026, budgetSale: 27000, budgetCost: 13500, stands: 1 },
+        { id: 2, name: 'ALIMENTARIA', location: 'BCN', client: 'Client1', year: 2026, budgetSale: 20000, budgetCost: 7000, stands: 1 },
+        { id: 3, name: 'SEAFOOD BCN', location: 'BCN', client: 'Client2', year: 2026, budgetSale: 315000, budgetCost: 160891, stands: 7 },
+        { id: 4, name: 'NAVALIA', location: 'Local', client: 'Client3', year: 2026, budgetSale: 120000, budgetCost: 54415, stands: 8 },
+        { id: 5, name: 'MARMOMAC', location: 'INT', client: 'Client4', year: 2026, budgetSale: 60000, budgetCost: 34412, stands: 2 },
+        { id: 6, name: 'SMART CITY', location: 'BCN', client: 'Client5', year: 2026, budgetSale: 135000, budgetCost: 63644, stands: 3 },
+    ];
+
+    let costs = [
+        { id: 1, exhibitionId: 1, category: 'CARPINTERIA', realCost: -1700, ptoType: 'GASTO', date: '2026-03-10' },
+        { id: 2, exhibitionId: 1, category: 'ELECTRICIDAD', realCost: -1860, ptoType: 'GASTO', date: '2026-03-10' },
+        { id: 3, exhibitionId: 1, category: 'GASTOS VIAJE', realCost: -1300, ptoType: 'GASTO', date: '2026-03-10' },
+        { id: 4, exhibitionId: 2, category: 'CARPINTERIA', realCost: -2500, ptoType: 'GASTO', date: '2026-03-12' },
+        { id: 5, exhibitionId: 3, category: 'MONTAJE', realCost: -45000, ptoType: 'GASTO', date: '2026-03-15' },
+        { id: 6, exhibitionId: 3, category: 'ELECTRICIDAD', realCost: -22000, ptoType: 'GASTO', date: '2026-03-15' },
+        { id: 7, exhibitionId: 3, category: 'GRAFICA', realCost: -18500, ptoType: 'GASTO', date: '2026-03-16' },
+    ];
+
+    let currentExhibition = 1;
+    let analysisChart = null;
+    let marginChart = null;
+
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(value);
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(tabName).classList.remove('hidden');
+        event.target.classList.add('active');
+
+        if (tabName === 'dashboard') updateDashboard();
+        if (tabName === 'exhibitions') updateExhibitionsTab();
+        if (tabName === 'costs') updateCostsTab();
+        if (tabName === 'analysis') updateAnalysisTab();
+    }
+
+    function calculateGastoGG(cost) { return Math.abs(cost) * 0.07; }
+    function calculateImprevistos(cost) { return Math.abs(cost) * 0.03; }
+
+    function getFilteredExhibitions() {
+        const nameFilter = document.getElementById('filterExhibition')?.value || '';
+        return exhibitions.filter(e => e.name.toLowerCase().includes(nameFilter.toLowerCase()));
+    }
+
+    function updateDashboard() {
+        const filtered = getFilteredExhibitions();
+        const totalSales = filtered.reduce((s, e) => s + e.budgetSale, 0);
+        const totalRealCosts = costs.filter(c => filtered.some(e => e.id === c.exhibitionId)).reduce((s, c) => s + c.realCost, 0);
+        const totalGG = calculateGastoGG(totalRealCosts);
+        const totalImprevistos = calculateImprevistos(totalRealCosts);
+        const totalCosts = Math.abs(totalRealCosts) + totalGG + totalImprevistos;
+        const avgMargin = totalSales > 0 ? ((totalSales - totalCosts) / totalSales * 100) : 0;
+
+        document.getElementById('stat1Value').textContent = formatCurrency(totalSales);
+        document.getElementById('stat1Bar').style.width = '85%';
+
+        document.getElementById('stat2Value').textContent = formatCurrency(totalCosts);
+        document.getElementById('stat2Bar').style.width = '45%';
+
+        document.getElementById('stat3Value').textContent = avgMargin.toFixed(1) + '%';
+        document.getElementById('stat3Bar').style.width = (avgMargin).toFixed(0) + '%';
+
+        const grid = document.getElementById('dashboardGrid');
+        grid.innerHTML = '';
+
+        filtered.slice(0, 2).forEach(ex => {
+            const exCosts = costs.filter(c => c.exhibitionId === ex.id).reduce((s, c) => s + c.realCost, 0);
+            const exGG = calculateGastoGG(exCosts);
+            const exImprevistos = calculateImprevistos(exCosts);
+            const realMargin = ex.budgetSale + exCosts - exGG - exImprevistos;
+            const marginPercent = ex.budgetSale ? (realMargin / ex.budgetSale * 100) : 0;
+            const strokeDashoffset = 251.2 * (1 - marginPercent / 100);
+
+            grid.innerHTML += `
+                <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center text-center">
+                    <div class="relative size-48 mb-6">
+                        <svg class="size-full" viewbox="0 0 100 100">
+                            <circle class="text-slate-200 dark:text-slate-800 stroke-current" cx="50" cy="50" fill="transparent" r="40" stroke-width="8"></circle>
+                            <circle class="text-primary stroke-current progress-ring" cx="50" cy="50" fill="transparent" r="40" stroke-dasharray="251.2" stroke-dashoffset="${strokeDashoffset}" stroke-linecap="round" stroke-width="8"></circle>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-4xl font-black text-slate-900 dark:text-slate-100">${marginPercent.toFixed(0)}%</span>
+                            <span class="text-xs font-bold text-slate-500 uppercase">Margen</span>
+                        </div>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 dark:text-slate-100 mb-2">${ex.name}</h3>
+                    <p class="text-slate-500 dark:text-slate-400 text-sm max-w-xs mb-6">${ex.client} • ${ex.stands} stands</p>
+                    <div class="flex gap-4 w-full border-t border-slate-200 dark:border-slate-800 pt-6">
+                        <div class="flex-1">
+                            <p class="text-xs text-slate-400 uppercase font-bold">Venta</p>
+                            <p class="text-lg font-bold text-slate-900 dark:text-slate-100">${formatCurrency(ex.budgetSale)}</p>
+                        </div>
+                        <div class="w-px bg-slate-200 dark:bg-slate-800"></div>
+                        <div class="flex-1">
+                            <p class="text-xs text-slate-400 uppercase font-bold">Coste</p>
+                            <p class="text-lg font-bold text-slate-900 dark:text-slate-100">${formatCurrency(totalCosts)}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function updateExhibitionsTab() {
+        const grid = document.getElementById('exhibitionsGrid');
+        grid.innerHTML = '';
+        exhibitions.forEach(ex => {
+            grid.innerHTML += `
+                <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 relative overflow-hidden group">
+                    <div class="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                        <span class="material-symbols-outlined text-6xl">event</span>
+                    </div>
+                    <p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-widest mb-2">${ex.location}</p>
+                    <h4 class="text-lg font-bold text-slate-900 dark:text-slate-100 mb-2">${ex.name}</h4>
+                    <p class="text-slate-600 dark:text-slate-400 text-sm mb-4">${ex.client}</p>
+                    <div class="flex items-end gap-2 mb-4">
+                        <span class="text-2xl font-black text-slate-900 dark:text-slate-100">${ex.stands}</span>
+                        <span class="text-slate-500 text-sm pb-1">stands</span>
+                    </div>
+                    <div class="space-y-2 border-t border-slate-200 dark:border-slate-700 pt-4">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600 dark:text-slate-400">Venta:</span>
+                            <span class="font-bold text-primary">${formatCurrency(ex.budgetSale)}</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600 dark:text-slate-400">Coste:</span>
+                            <span class="font-bold text-primary">${formatCurrency(ex.budgetCost)}</span>
+                        </div>
+                    </div>
+                    <button onclick="deleteExhibition(${ex.id})" class="mt-4 w-full py-2 text-red-500 hover:bg-red-500/10 rounded-lg text-sm font-bold transition-colors">
+                        <span class="material-symbols-outlined text-[16px]" style="display: inline;">delete</span> Eliminar
+                    </button>
+                </div>
+            `;
+        });
+    }
+
+    function updateCostsTab() {
+        currentExhibition = parseInt(document.getElementById('exhibitionSelect').value);
+        refreshExhibitionSelect();
+
+        const exhibitionCosts = costs.filter(c => c.exhibitionId === currentExhibition);
+        const totalRealCosts = exhibitionCosts.reduce((s, c) => s + c.realCost, 0);
+        const gastoGG = calculateGastoGG(totalRealCosts);
+        const imprevistos = calculateImprevistos(totalRealCosts);
+
+        document.getElementById('totalCostsValue').textContent = formatCurrency(Math.abs(totalRealCosts));
+        document.getElementById('ggValue').textContent = formatCurrency(gastoGG);
+        document.getElementById('imprevistoValue').textContent = formatCurrency(imprevistos);
+
+        const tbody = document.getElementById('costsTableBody');
+        tbody.innerHTML = '';
+        exhibitionCosts.forEach(cost => {
+            const ex = exhibitions.find(e => e.id === cost.exhibitionId);
+            tbody.innerHTML += `
+                <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800">
+                    <td class="py-3 px-4">${ex.name}</td>
+                    <td class="py-3 px-4">${cost.category}</td>
+                    <td class="py-3 px-4"><span class="text-xs px-2 py-1 rounded-full ${cost.ptoType === 'GASTO' ? 'bg-red-500/10 text-red-600' : 'bg-green-500/10 text-green-600'}">${cost.ptoType}</span></td>
+                    <td class="py-3 px-4 text-right font-bold text-primary">${formatCurrency(Math.abs(cost.realCost))}</td>
+                    <td class="py-3 px-4">${cost.date}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="deleteCost(${cost.id})" class="text-red-500 hover:text-red-700 font-bold">
+                            <span class="material-symbols-outlined text-[18px]" style="display: inline;">close</span>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    function updateAnalysisTab() {
+        const ex = exhibitions.find(e => e.id === currentExhibition);
+        const exhibitionCosts = costs.filter(c => c.exhibitionId === currentExhibition);
+        const categories = ['CARPINTERIA', 'MONTAJE', 'ELECTRICIDAD', 'GASTOS VIAJE', 'GRAFICA', 'MATERIAL', 'TRANSPORTE', 'SERVICIOS FERIALES'];
+
+        const chartData = [];
+        categories.forEach(cat => {
+            const realCosts = exhibitionCosts.filter(c => c.category === cat).reduce((s, c) => s + c.realCost, 0);
+            if (realCosts !== 0) {
+                chartData.push({
+                    category: cat,
+                    Real: Math.abs(realCosts),
+                    Presupuesto: Math.abs(realCosts) / 0.9
+                });
+            }
+        });
+
+        if (analysisChart) analysisChart.destroy();
+        if (chartData.length > 0) {
+            const ctx = document.getElementById('analysisChart').getContext('2d');
+            analysisChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: chartData.map(d => d.category),
+                    datasets: [
+                        { label: 'Presupuesto', data: chartData.map(d => d.Presupuesto), backgroundColor: 'rgba(212, 175, 55, 0.3)' },
+                        { label: 'Real', data: chartData.map(d => d.Real), backgroundColor: 'rgba(212, 175, 55, 0.8)' }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top' } } }
+            });
+        }
+
+        // Gráfico de márgenes por feria
+        const marginData = exhibitions.map(e => {
+            const eCosts = costs.filter(c => c.exhibitionId === e.id).reduce((s, c) => s + c.realCost, 0);
+            const eGG = calculateGastoGG(eCosts);
+            const eImprevistos = calculateImprevistos(eCosts);
+            const margin = e.budgetSale + eCosts - eGG - eImprevistos;
+            return { name: e.name, margin: (margin / e.budgetSale * 100) };
+        });
+
+        if (marginChart) marginChart.destroy();
+        const ctx2 = document.getElementById('marginChart').getContext('2d');
+        marginChart = new Chart(ctx2, {
+            type: 'bar',
+            data: {
+                labels: marginData.map(d => d.name),
+                datasets: [{
+                    label: 'Margen %',
+                    data: marginData.map(d => d.margin),
+                    backgroundColor: marginData.map(d => d.margin >= 40 ? '#16a34a' : '#dc2626')
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false } } }
+        });
+    }
+
+    function openNewExhibitionModal() {
+        document.getElementById('newExhibitionModal').classList.add('active');
+    }
+
+    function openNewCostModal() {
+        refreshExhibitionSelectInModal();
+        document.getElementById('newCostModal').classList.add('active');
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.remove('active');
+    }
+
+    function saveNewExhibition(e) {
+        e.preventDefault();
+        const newId = Math.max(...exhibitions.map(e => e.id)) + 1;
+        exhibitions.push({
+            id: newId,
+            name: document.getElementById('newExhName').value,
+            client: document.getElementById('newExhClient').value,
+            location: document.getElementById('newExhLocation').value,
+            stands: parseInt(document.getElementById('newExhStands').value),
+            year: 2026,
+            budgetSale: parseFloat(document.getElementById('newExhSale').value),
+            budgetCost: parseFloat(document.getElementById('newExhCost').value)
+        });
+        closeModal('newExhibitionModal');
+        e.target.reset();
+        updateExhibitionsTab();
+        refreshExhibitionSelect();
+    }
+
+    function saveNewCost(e) {
+        e.preventDefault();
+        const newId = Math.max(...costs.map(c => c.id)) + 1;
+        costs.push({
+            id: newId,
+            exhibitionId: parseInt(document.getElementById('newCostExhId').value),
+            category: document.getElementById('newCostCategory').value,
+            realCost: -Math.abs(parseFloat(document.getElementById('newCostAmount').value)),
+            ptoType: document.getElementById('newCostType').value,
+            date: new Date().toISOString().split('T')[0]
+        });
+        closeModal('newCostModal');
+        e.target.reset();
+        updateCostsTab();
+        updateDashboard();
+    }
+
+    function deleteCost(id) {
+        costs = costs.filter(c => c.id !== id);
+        updateCostsTab();
+    }
+
+    function deleteExhibition(id) {
+        exhibitions = exhibitions.filter(e => e.id !== id);
+        costs = costs.filter(c => c.exhibitionId !== id);
+        updateExhibitionsTab();
+        refreshExhibitionSelect();
+    }
+
+    function refreshExhibitionSelect() {
+        const select = document.getElementById('exhibitionSelect');
+        select.innerHTML = '';
+        exhibitions.forEach(ex => {
+            select.innerHTML += `<option value="${ex.id}">${ex.name}</option>`;
+        });
+        if (exhibitions.length > 0) {
+            currentExhibition = exhibitions[0].id;
+            select.value = currentExhibition;
+        }
+    }
+
+    function refreshExhibitionSelectInModal() {
+        const select = document.getElementById('newCostExhId');
+        select.innerHTML = '';
+        exhibitions.forEach(ex => {
+            select.innerHTML += `<option value="${ex.id}">${ex.name}</option>`;
+        });
+    }
+
+    function exportData() {
+        alert('Funcionalidad de exportación próximamente disponible');
+    }
+
+    window.addEventListener('load', () => {
+        refreshExhibitionSelect();
+        refreshExhibitionSelectInModal();
+        updateDashboard();
+    });
+</script>
+</body>
+</html>

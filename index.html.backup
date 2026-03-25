@@ -1530,79 +1530,112 @@ function buildCargaFilters() {
     return;
   }
 
-  // Clientes - Single select dropdown (ONLY from current feria)
+  // Clientes - Multi-select con separación
   if (cSelFeria !== null) {
     const feria = allFerias.find(f => f.year === cSelYear && f.name === cSelFeria);
     const feriaId = feria ? feria.id : null;
 
-    // Get ONLY clients assigned to this feria
-    const feriaClients = [];
+    const clientsMap = new Map();
+    const assignedClients = new Set();
+    const unassignedClients = new Set();
+
     allClients.forEach(c => {
+      clientsMap.set(c.id, c.name);
       const assignments = clientFeriaAssignments.get(c.id) || new Set();
       if (assignments.has(feriaId)) {
-        feriaClients.push({ id: c.id, name: c.name });
+        assignedClients.add(c.id);
+      } else {
+        unassignedClients.add(c.id);
       }
     });
 
-    feriaClients.sort((a, b) => a.name.localeCompare(b.name));
+    const sortedAssigned = [...assignedClients].sort((a, b) =>
+      clientsMap.get(a).localeCompare(clientsMap.get(b))
+    );
+    const sortedUnassigned = [...unassignedClients].sort((a, b) =>
+      clientsMap.get(a).localeCompare(clientsMap.get(b))
+    );
 
     const container = document.getElementById('cChipsCliente');
     container.innerHTML = '';
 
-    // Dropdown container
-    const dropdownContainer = document.createElement('div');
-    dropdownContainer.style.cssText = 'display:flex;gap:12px;align-items:center;width:100%;';
-
-    // Dropdown select
-    const select = document.createElement('select');
-    select.style.cssText = `
-      flex:1;
-      padding:10px 12px;
-      background:#222222;
-      color:#e5e7eb;
-      border:1px solid #333333;
-      border-radius:4px;
-      font-size:14px;
-      cursor:pointer;
-      font-family:'Inter',sans-serif;
-    `;
-
-    // Option: Seleccionar Cliente
-    const optionDefault = document.createElement('option');
-    optionDefault.value = '';
-    optionDefault.textContent = '→ Seleccionar Cliente';
-    optionDefault.selected = cSelCliente === null;
-    select.appendChild(optionDefault);
-
-    // Options: Feria clients
-    feriaClients.forEach(client => {
-      const option = document.createElement('option');
-      option.value = client.id;
-      option.textContent = client.name;
-      option.selected = cSelCliente === client.id;
-      select.appendChild(option);
-    });
-
-    select.onchange = (e) => {
-      cSelCliente = e.target.value || null;
-      renderCargaContent();
+    // Botón "TODOS"
+    const btnTodos = document.createElement('button');
+    btnTodos.className = 'chip' + (cSelClientesMultiples.size === 0 ? ' active' : '');
+    btnTodos.textContent = 'TODOS';
+    btnTodos.onclick = () => {
+      cSelClientesMultiples.clear();
+      buildCargaFilters();
     };
+    container.appendChild(btnTodos);
 
-    dropdownContainer.appendChild(select);
+    // Sección: Asignados
+    if (sortedAssigned.length > 0) {
+      const sectionLabel = document.createElement('div');
+      sectionLabel.style.cssText = 'width:100%;padding:12px 0 8px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;';
+      sectionLabel.textContent = '📌 Asignados a esta feria';
+      container.appendChild(sectionLabel);
 
-    // Button: Create new
+      sortedAssigned.forEach(clientId => {
+        const btn = document.createElement('button');
+        btn.className = 'chip' + (cSelClientesMultiples.has(clientId) ? ' active' : '');
+        btn.textContent = clientsMap.get(clientId);
+        btn.style.cursor = 'pointer';
+        btn.onclick = () => {
+          if (cSelClientesMultiples.has(clientId)) {
+            cSelClientesMultiples.delete(clientId);
+          } else {
+            cSelClientesMultiples.add(clientId);
+          }
+          buildCargaFilters();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    // Sección: De otras ferias
+    if (sortedUnassigned.length > 0) {
+      const sectionLabel = document.createElement('div');
+      sectionLabel.style.cssText = 'width:100%;padding:12px 0 8px 0;color:#9ca3af;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-top:12px;border-top:1px solid #222;';
+      sectionLabel.textContent = '+ De otras ferias (click asigna)';
+      container.appendChild(sectionLabel);
+
+      sortedUnassigned.forEach(clientId => {
+        const btn = document.createElement('button');
+        btn.className = 'chip' + (cSelClientesMultiples.has(clientId) ? ' active' : '');
+        btn.textContent = clientsMap.get(clientId) + ' →';
+        btn.style.cursor = 'pointer';
+        btn.style.opacity = '0.7';
+        btn.onclick = async () => {
+          if (!assignedClients.has(clientId)) {
+            await assignClientToFeria(clientId, feriaId);
+            const set = clientFeriaAssignments.get(clientId) || new Set();
+            set.add(feriaId);
+            clientFeriaAssignments.set(clientId, set);
+          }
+          if (cSelClientesMultiples.has(clientId)) {
+            cSelClientesMultiples.delete(clientId);
+          } else {
+            cSelClientesMultiples.add(clientId);
+          }
+          buildCargaFilters();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    // Botón crear nuevo
     const newBtn = document.createElement('button');
     newBtn.className = 'chip';
-    newBtn.textContent = '+ NUEVO';
-    newBtn.style.cssText = 'border:1px dashed #e3a017;color:#e3a017;background:transparent;cursor:pointer;white-space:nowrap;';
+    newBtn.textContent = '+ NUEVO CLIENTE';
+    newBtn.style.cssText = 'margin-top:12px;border:1px dashed #e3a017;color:#e3a017;background:transparent;cursor:pointer;';
     newBtn.onclick = () => document.getElementById('modalCreateCliente').classList.add('active');
-    dropdownContainer.appendChild(newBtn);
+    container.appendChild(newBtn);
 
-    container.appendChild(dropdownContainer);
     renderCargaContent();
   } else {
     document.getElementById('cChipsCliente').innerHTML = '';
-    cSelCliente = null;
+    cSelClientesMultiples.clear();
     renderCargaContent();
   }
 }
@@ -1653,10 +1686,10 @@ async function assignClientToFeria(clientId, feriaId) {
 function renderCargaContent() {
   const content = document.getElementById('cargaContent');
 
-  // Si no hay cliente seleccionado, mostrar mensaje
-  if (cSelCliente === null) {
+  // Si no hay clientes seleccionados, mostrar formulario
+  if (cSelClientesMultiples.size === 0) {
     if (cSelYear !== null && cSelFeria !== null) {
-      content.innerHTML = '<p style="padding:20px;color:#9ca3af;text-align:center;">Selecciona un cliente para cargar datos</p>';
+      content.innerHTML = '<p style="padding:20px;color:#9ca3af;text-align:center;">Selecciona uno o más clientes para cargar datos</p>';
     } else {
       content.innerHTML = '';
     }
@@ -1666,9 +1699,9 @@ function renderCargaContent() {
   const feria = allFerias.find(f => f.year === cSelYear && f.name === cSelFeria);
   const feriaId = feria ? feria.id : null;
 
-  // Cargar costos para el cliente seleccionado + feria
+  // Cargar costos para los clientes seleccionados + feria
   const cargaCosts = allCosts.filter(c =>
-    c.feriaId === feriaId && c.clientId === cSelCliente
+    c.feriaId === feriaId && cSelClientesMultiples.has(c.clientId)
   );
 
   let html = '';
@@ -1676,22 +1709,14 @@ function renderCargaContent() {
   // Formulario de carga
   html += renderCargaForm();
 
-  // Vista de costos cargados con expandible + gráfico
+  // Vista de costos cargados
   if (cargaCosts.length > 0) {
-    html += '<div style="margin-bottom:24px;">';
     html += renderCargaDetail(cargaCosts);
-    html += '</div>';
-
-    // Agregar gráfico
-    html += '<div style="margin-top:32px;padding:20px;background:#1a1a1a;border-radius:4px;border:1px solid #222222;">';
-    html += `<h3 style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:16px;color:#e5e7eb;">Desglose por Categoría</h3>`;
-    html += '<div id="cargaChartContainer" style="position:relative;width:100%;height:300px;"></div>';
-    html += '</div>';
   }
 
   content.innerHTML = html;
 
-  // Agregar event listeners para expandibles
+  // Agregar event listeners
   document.querySelectorAll('.carga-group-header').forEach(el => {
     el.addEventListener('click', function() {
       const body = this.nextElementSibling;
@@ -1701,11 +1726,6 @@ function renderCargaContent() {
       arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
     });
   });
-
-  // Mostrar gráfico
-  if (cargaCosts.length > 0) {
-    setTimeout(() => showChartCarga(cargaCosts), 100);
-  }
 }
 
 function renderCargaForm() {
@@ -1790,9 +1810,9 @@ async function saveCargaCost() {
     return;
   }
 
-  // Validar que hay cliente seleccionado
-  if (!cSelCliente) {
-    alert('Selecciona un cliente');
+  // Si hay múltiples clientes, mostrar modal de distribución
+  if (cSelClientesMultiples.size > 1) {
+    openDistributionModal(importe, Array.from(cSelClientesMultiples));
     return;
   }
 
@@ -1803,8 +1823,8 @@ async function saveCargaCost() {
       return;
     }
 
-    // Obtener el cliente seleccionado
-    const clientId = cSelCliente;
+    // Obtener el cliente único seleccionado
+    const clientId = Array.from(cSelClientesMultiples)[0];
     const clientName = allClients.find(c => c.id === clientId)?.name || '';
 
     // Asignar cliente a feria si no está asignado
@@ -1890,24 +1910,6 @@ function renderCargaDetail(costs) {
   html += '</div>';
 
   return html;
-}
-
-function showChartCarga(costs) {
-  // Group by type2 (category)
-  const grouped = {};
-  costs.forEach(c => {
-    const cat = c.type2 || c.category || c.tipo || 'OTROS';
-    if (!grouped[cat]) grouped[cat] = 0;
-    const amt = parseFloat(c.amount) || 0;
-    grouped[cat] += Math.abs(amt);
-  });
-
-  const categories = Object.keys(grouped).sort();
-  const data = categories.map(cat => ({ label: cat, value: grouped[cat] }));
-
-  if (data.length > 0) {
-    drawChart('Desglose por Categoría', data, 0, 'cargaChartContainer');
-  }
 }
 
 // ── PRESUPUESTOS ──────────────────────────────────────────
@@ -2099,20 +2101,15 @@ function renderPptoAvance(pptosFiltered) {
   });
 
   let realIncome = 0, realGastos = 0;
-  const realesByKey = {};
   if (pptoSelYears.size > 0) {
     const years = Array.from(pptoSelYears);
     const feriaIds = new Set(allFerias.filter(f=>years.some(y=>f.year===y)).map(f=>f.id));
-    allCosts.forEach(c => {
-      if (feriaIds.has(c.feriaId)) {
-        const amt = parseFloat(c.amount) || 0;
-        if (amt > 0) realIncome += Math.abs(amt);
-        else realGastos += Math.abs(amt);
-        const key = `${c.feriaId}|${c.clientId||''}|${c.type}|${c.category||''}`;
-        if (!realesByKey[key]) realesByKey[key] = 0;
-        realesByKey[key] += Math.abs(amt);
-      }
-    });
+    realIncome = allCosts
+      .filter(c => feriaIds.has(c.feriaId) && (c.type === 'VENTAS' || parseFloat(c.amount) > 0))
+      .reduce((sum, c) => sum + Math.abs(parseFloat(c.amount) || 0), 0);
+    realGastos = allCosts
+      .filter(c => feriaIds.has(c.feriaId) && parseFloat(c.amount) < 0)
+      .reduce((sum, c) => sum + Math.abs(parseFloat(c.amount) || 0), 0);
   }
 
   const pptoMargen = pptoBudget - pptoGastos;
@@ -2127,66 +2124,32 @@ function renderPptoAvance(pptosFiltered) {
   pptoIngDev.classList.toggle('green', (realIncome - pptoBudget) >= 0);
   pptoIngDevPct.textContent = fmt(((realIncome - pptoBudget) / (pptoBudget || 1)) * 100, 'percent');
 
-  let html = `<h3 style="font-size:13px;color:#9ca3af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Ingresos Detallado</h3>`;
+  // Tabla comparativa
+  let html = `<h3 style="font-size:13px;color:#9ca3af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Ingresos</h3>`;
   html += `<table style="width:100%;font-size:12px;margin-bottom:24px;border-collapse:collapse;">`;
-  html += `<thead style="border-bottom:1px solid #333;"><tr style="color:#9ca3af;"><th style="text-align:left;padding:8px;">Descripción</th><th style="text-align:right;padding:8px;">Categoría</th><th style="text-align:right;padding:8px;">Presupuestado</th><th style="text-align:right;padding:8px;">Real</th><th style="text-align:right;padding:8px;">Diferencia</th><th style="text-align:right;padding:8px;">% Var</th></tr></thead>`;
+  html += `<thead style="border-bottom:1px solid #333;"><tr style="color:#9ca3af;"><th style="text-align:left;padding:8px;">Concepto</th><th style="text-align:right;padding:8px;">Presupuestado</th><th style="text-align:right;padding:8px;">Real</th><th style="text-align:right;padding:8px;">Diferencia</th><th style="text-align:right;padding:8px;">% Variación</th></tr></thead>`;
   html += `<tbody>`;
-  let ingresosPptoTotal = 0, ingresosRealTotal = 0;
-  const ingresos = pptosFiltered.filter(p => p.tipo === '1. INGRESO');
-  if (ingresos.length > 0) {
-    ingresos.forEach(p => {
-      const presupuestado = parseFloat(p.importe) || 0;
-      ingresosPptoTotal += Math.abs(presupuestado);
-      const real = realesByKey[`|${p.cliente||''}|VENTAS|${p.categoria||''}`] || 0;
-      ingresosRealTotal += real;
-      const diff = real - presupuestado;
-      const pct = presupuestado > 0 ? ((diff / presupuestado) * 100).toFixed(1) : '—';
-      const color = real > 0 ? (diff >= 0 ? '#10b981' : '#ef4444') : '#9ca3af';
-      html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;">${p.descripcion || '—'}</td><td style="padding:8px;text-align:right;color:#9ca3af;font-size:11px;">${p.categoria || '—'}</td><td style="text-align:right;padding:8px;color:#10b981;">${fmt(presupuestado)}</td><td style="text-align:right;padding:8px;color:${real>0?'#10b981':'#9ca3af'};font-weight:${real>0?'600':'400'};opacity:${real>0?'1':'0.6'}">${fmt(real)}</td><td style="text-align:right;padding:8px;color:${color};font-weight:600;">${fmt(diff)}</td><td style="text-align:right;padding:8px;color:${color};font-weight:600;">${pct}${pct!=='—'?'%':''}</td></tr>`;
-    });
-  } else {
-    html += `<tr style="border-bottom:1px solid #222;"><td colspan="6" style="padding:8px;text-align:center;color:#6b7280;">Sin ingresos presupuestados</td></tr>`;
-  }
-  const diffIngresos = ingresosRealTotal - ingresosPptoTotal;
-  const pctIngresos = ingresosPptoTotal > 0 ? ((diffIngresos / ingresosPptoTotal) * 100).toFixed(1) : 0;
-  html += `<tr style="border-top:2px solid #333;background:#1a1a1a;font-weight:700;"><td colspan="2" style="padding:8px;color:#e3a017;">TOTAL INGRESOS</td><td style="text-align:right;padding:8px;color:#10b981;">${fmt(ingresosPptoTotal)}</td><td style="text-align:right;padding:8px;color:#10b981;">${fmt(ingresosRealTotal)}</td><td style="text-align:right;padding:8px;color:${diffIngresos>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(diffIngresos)}</td><td style="text-align:right;padding:8px;color:${diffIngresos>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(pctIngresos, 'percent')}</td></tr>`;
+  const incomeDev = realIncome - pptoBudget;
+  const incomePct = pptoBudget > 0 ? ((incomeDev / pptoBudget) * 100).toFixed(1) : 0;
+  html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;font-weight:600;">INGRESOS</td><td style="text-align:right;padding:8px;color:#10b981;">${fmt(pptoBudget)}</td><td style="text-align:right;padding:8px;color:#10b981;">${fmt(realIncome)}</td><td style="text-align:right;padding:8px;color:${incomeDev>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(incomeDev)}</td><td style="text-align:right;padding:8px;color:${incomeDev>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(incomePct, 'percent')}</td></tr>`;
   html += `</tbody></table>`;
 
-  html += `<h3 style="font-size:13px;color:#9ca3af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Gastos Detallado</h3>`;
+  html += `<h3 style="font-size:13px;color:#9ca3af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Gastos</h3>`;
   html += `<table style="width:100%;font-size:12px;margin-bottom:24px;border-collapse:collapse;">`;
-  html += `<thead style="border-bottom:1px solid #333;"><tr style="color:#9ca3af;"><th style="text-align:left;padding:8px;">Descripción</th><th style="text-align:right;padding:8px;">Categoría</th><th style="text-align:right;padding:8px;">Presupuestado</th><th style="text-align:right;padding:8px;">Real</th><th style="text-align:right;padding:8px;">Ahorro / (Exceso)</th><th style="text-align:right;padding:8px;">% Var</th></tr></thead>`;
+  html += `<thead style="border-bottom:1px solid #333;"><tr style="color:#9ca3af;"><th style="text-align:left;padding:8px;">Concepto</th><th style="text-align:right;padding:8px;">Presupuestado</th><th style="text-align:right;padding:8px;">Real</th><th style="text-align:right;padding:8px;">Diferencia</th><th style="text-align:right;padding:8px;">% Variación</th></tr></thead>`;
   html += `<tbody>`;
-  let gastosPptoTotal = 0, gastosRealTotal = 0;
-  const gastos = pptosFiltered.filter(p => p.tipo !== '1. INGRESO');
-  if (gastos.length > 0) {
-    gastos.forEach(p => {
-      const presupuestado = parseFloat(p.importe) || 0;
-      gastosPptoTotal += Math.abs(presupuestado);
-      const real = realesByKey[`|${p.cliente||''}|GASTO|${p.categoria||''}`] || 0;
-      gastosRealTotal += real;
-      const ahorro = presupuestado - real;
-      const pct = presupuestado > 0 ? ((ahorro / presupuestado) * 100).toFixed(1) : '—';
-      const color = real > 0 ? (ahorro >= 0 ? '#10b981' : '#ef4444') : '#9ca3af';
-      html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;">${p.descripcion || '—'}</td><td style="padding:8px;text-align:right;color:#9ca3af;font-size:11px;">${p.categoria || '—'}</td><td style="text-align:right;padding:8px;color:#ef4444;">${fmt(presupuestado)}</td><td style="text-align:right;padding:8px;color:${real>0?'#ef4444':'#9ca3af'};font-weight:${real>0?'600':'400'};opacity:${real>0?'1':'0.6'}">${fmt(real)}</td><td style="text-align:right;padding:8px;color:${color};font-weight:600;">${fmt(ahorro)}</td><td style="text-align:right;padding:8px;color:${color};font-weight:600;">${pct}${pct!=='—'?'%':''}</td></tr>`;
-    });
-  } else {
-    html += `<tr style="border-bottom:1px solid #222;"><td colspan="6" style="padding:8px;text-align:center;color:#6b7280;">Sin gastos presupuestados</td></tr>`;
-  }
-  const ahorroGastos = gastosPptoTotal - gastosRealTotal;
-  const pctGastos = gastosPptoTotal > 0 ? ((ahorroGastos / gastosPptoTotal) * 100).toFixed(1) : 0;
-  html += `<tr style="border-top:2px solid #333;background:#1a1a1a;font-weight:700;"><td colspan="2" style="padding:8px;color:#e3a017;">TOTAL GASTOS</td><td style="text-align:right;padding:8px;color:#ef4444;">${fmt(gastosPptoTotal)}</td><td style="text-align:right;padding:8px;color:#ef4444;">${fmt(gastosRealTotal)}</td><td style="text-align:right;padding:8px;color:${ahorroGastos>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(ahorroGastos)}</td><td style="text-align:right;padding:8px;color:${ahorroGastos>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(pctGastos, 'percent')}</td></tr>`;
+  const gastvos = realGastos - pptoGastos;
+  const gastPct = pptoGastos > 0 ? ((gastvos / pptoGastos) * 100).toFixed(1) : 0;
+  html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;font-weight:600;">GASTOS</td><td style="text-align:right;padding:8px;color:#ef4444;">${fmt(pptoGastos)}</td><td style="text-align:right;padding:8px;color:#ef4444;">${fmt(realGastos)}</td><td style="text-align:right;padding:8px;color:${gastvos<=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(gastvos)}</td><td style="text-align:right;padding:8px;color:${gastvos<=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(gastPct, 'percent')}</td></tr>`;
   html += `</tbody></table>`;
 
   html += `<h3 style="font-size:13px;color:#9ca3af;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Margen</h3>`;
   html += `<table style="width:100%;font-size:12px;margin-bottom:24px;border-collapse:collapse;">`;
   html += `<thead style="border-bottom:1px solid #333;"><tr style="color:#9ca3af;"><th style="text-align:left;padding:8px;">Concepto</th><th style="text-align:right;padding:8px;">Presupuestado</th><th style="text-align:right;padding:8px;">Real</th><th style="text-align:right;padding:8px;">Diferencia</th><th style="text-align:right;padding:8px;">% Margen Real</th></tr></thead>`;
   html += `<tbody>`;
-  const pptoMargenCalc = ingresosPptoTotal - gastosPptoTotal;
-  const realMargenCalc = ingresosRealTotal - gastosRealTotal;
-  const marginDiff = realMargenCalc - pptoMargenCalc;
-  const realMargenPct = ingresosRealTotal > 0 ? ((realMargenCalc / ingresosRealTotal) * 100).toFixed(1) : '—';
-  const pptoMargenPct = ingresosPptoTotal > 0 ? ((pptoMargenCalc / ingresosPptoTotal) * 100).toFixed(1) : '—';
-  html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;font-weight:600;">MARGEN</td><td style="text-align:right;padding:8px;color:#d4af37;">${fmt(pptoMargenCalc)} (${pptoMargenPct}${pptoMargenPct!=='—'?'%':''})</td><td style="text-align:right;padding:8px;color:#d4af37;">${ingresosRealTotal > 0 ? fmt(realMargenCalc) + ' (' + realMargenPct + '%)' : 'Aún sin datos reales'}</td><td style="text-align:right;padding:8px;color:${marginDiff>=0?'#10b981':'#ef4444'};font-weight:600;">${ingresosRealTotal > 0 ? fmt(marginDiff) : '—'}</td><td style="text-align:right;padding:8px;color:${marginDiff>=0?'#10b981':'#ef4444'};font-weight:600;">${ingresosRealTotal > 0 ? (pptoMargenCalc > 0 ? fmt(((marginDiff / pptoMargenCalc) * 100), 'percent') : '—') : '—'}</td></tr>`;
+  const realMargenPct = realIncome > 0 ? ((realMargen / realIncome) * 100).toFixed(1) : 0;
+  const pptoMargenPct = pptoBudget > 0 ? ((pptoMargen / pptoBudget) * 100).toFixed(1) : 0;
+  html += `<tr style="border-bottom:1px solid #222;"><td style="padding:8px;font-weight:600;">MARGEN</td><td style="text-align:right;padding:8px;color:#d4af37;">${fmt(pptoMargen)} (${pptoMargenPct}%)</td><td style="text-align:right;padding:8px;color:#d4af37;">${fmt(realMargen)} (${realMargenPct}%)</td><td style="text-align:right;padding:8px;color:${marginDev>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(marginDev)}</td><td style="text-align:right;padding:8px;color:${marginDev>=0?'#10b981':'#ef4444'};font-weight:600;">${fmt(marginPct, 'percent')}</td></tr>`;
   html += `</tbody></table>`;
 
   block.innerHTML = html;
@@ -2369,14 +2332,6 @@ async function createCliente() {
     const cSnap = await db.collection('clients').get();
     allClients = [];
     cSnap.forEach(d => allClients.push({id:d.id,...d.data()}));
-
-    // Auto-select the newly created client
-    if (cSelFeria !== null && cSelYear !== null) {
-      const feria = allFerias.find(f => f.year === cSelYear && f.name === cSelFeria);
-      if (feria) {
-        cSelCliente = clientRef.id;
-      }
-    }
 
     closeModal('modalCreateCliente');
     document.getElementById('createClienteNombre').value = '';

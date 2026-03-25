@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Importador - Demostra</title>
+    <style>
+        body { font-family: Arial; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
+        h1 { color: #1e3c72; }
+        button { background: #2a5298; color: white; border: none; padding: 10px 20px; cursor: pointer; border-radius: 4px; margin: 10px 5px 10px 0; }
+        button:disabled { background: #ccc; }
+        .log { background: #f9f9f9; border: 1px solid #ddd; padding: 10px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; margin: 15px 0; }
+        .log-entry { margin: 3px 0; }
+        .success { color: #27ae60; }
+        .error { color: #e74c3c; }
+        .info { color: #3498db; }
+        .progress { width: 100%; height: 20px; background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background: #2a5298; width: 0%; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Importador de Datos - Demostra</h1>
+        <p>Limpia la BD e importa los 1227 registros del Excel</p>
+
+        <div class="progress"><div class="progress-bar" id="progress"></div></div>
+        <div id="status" style="margin: 10px 0; font-weight: bold;">Listo</div>
+
+        <div class="log" id="log"></div>
+
+        <button id="btnClean" onclick="cleanDB()" disabled>🗑️ Paso 1: Limpiar BD</button>
+        <button id="btnImport" onclick="importData()" disabled>📥 Paso 2: Importar</button>
+        <button onclick="location.reload()">↻ Reiniciar</button>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        let db = null;
+
+        firebase.initializeApp({
+            apiKey: "AIzaSyBg3VcwvSTPw-N5RNAKgnT8wWNCQKn_P2E",
+            authDomain: "demostrapp-b14c9.firebaseapp.com",
+            projectId: "demostrapp-b14c9",
+            storageBucket: "demostrapp-b14c9.firebasestorage.app",
+            messagingSenderId: "519261039851",
+            appId: "1:519261039851:web:1f1b9ed40ffde29ecc4c09"
+        });
+
+        setTimeout(() => {
+            db = firebase.firestore();
+            document.getElementById('btnClean').disabled = false;
+            log('✓ Firebase conectado', 'success');
+            status('✅ Listo');
+        }, 500);
+
+        function log(msg, type = 'info') {
+            const el = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+            el.appendChild(entry);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function status(msg) {
+            document.getElementById('status').textContent = msg;
+        }
+
+        function progress(curr, total) {
+            const pct = Math.round((curr / total) * 100);
+            document.getElementById('progress').style.width = pct + '%';
+        }
+
+        async function cleanDB() {
+            if (!db) {
+                log('✗ Firebase no está listo', 'error');
+                return;
+            }
+            const btn = document.getElementById('btnClean');
+            btn.disabled = true;
+            status('🧹 Limpiando...');
+            log('Iniciando limpieza', 'info');
+
+            try {
+                // Delete exhibitions
+                log('Eliminando ferias...', 'info');
+                const exh = await db.collection('exhibitions').get();
+                for (const doc of exh.docs) await doc.ref.delete();
+                log('✓ ' + exh.size + ' ferias eliminadas', 'success');
+
+                // Delete costs
+                log('Eliminando costos...', 'info');
+                const costs = await db.collection('costs').get();
+                for (const doc of costs.docs) await doc.ref.delete();
+                log('✓ ' + costs.size + ' costos eliminados', 'success');
+
+                // Delete clients
+                log('Eliminando clientes...', 'info');
+                const clients = await db.collection('clients').get();
+                for (const doc of clients.docs) await doc.ref.delete();
+                log('✓ ' + clients.size + ' clientes eliminados', 'success');
+
+                log('✓ Base de datos limpia', 'success');
+                status('✅ BD limpia. Listo para importar.');
+                document.getElementById('btnImport').disabled = false;
+            } catch(e) {
+                log('✗ Error: ' + e.message, 'error');
+                status('❌ Error');
+                btn.disabled = false;
+            }
+        }
+
+        async function importData() {
+            if (!db) {
+                log('✗ Firebase no está listo', 'error');
+                return;
+            }
+            const btn = document.getElementById('btnImport');
+            btn.disabled = true;
+            status('📥 Importando...');
+
+            try {
+                // Fetch data from JSON file
+                const resp = await fetch('./import_data.json');
+                if (!resp.ok) {
+                    throw new Error('No se puede leer import_data.json. Asegúrate que el archivo existe.');
+                }
+                const records = await resp.json();
+                log('Datos cargados: ' + records.length + ' registros', 'info');
+
+                const feriaMap = new Map();
+                const clientMap = new Map();
+
+                for (let i = 0; i < records.length; i++) {
+                    const r = records[i];
+                    progress(i, records.length);
+
+                    // Get or create feria
+                    if (!feriaMap.has(r.feria)) {
+                        const snap = await db.collection('exhibitions').where('name', '==', r.feria).limit(1).get();
+                        let id;
+                        if (snap.empty) {
+                            const doc = await db.collection('exhibitions').add({
+                                name: r.feria,
+                                year: r.año,
+                                totalSales: 0,
+                                totalCosts: 0,
+                                margin: 0
+                            });
+                            id = doc.id;
+                        } else {
+                            id = snap.docs[0].id;
+                        }
+                        feriaMap.set(r.feria, id);
+                    }
+
+                    // Get or create client
+                    if (!clientMap.has(r.cliente)) {
+                        const snap = await db.collection('clients').where('name', '==', r.cliente).limit(1).get();
+                        let id;
+                        if (snap.empty) {
+                            const doc = await db.collection('clients').add({ name: r.cliente });
+                            id = doc.id;
+                        } else {
+                            id = snap.docs[0].id;
+                        }
+                        clientMap.set(r.cliente, id);
+                    }
+
+                    // Create cost record
+                    await db.collection('costs').add({
+                        feriaId: feriaMap.get(r.feria),
+                        clientId: clientMap.get(r.cliente),
+                        description: r.descripcion,
+                        provider: r.proveedor,
+                        amount: r.importe,
+                        type: r.tipo,
+                        status: r.estado,
+                        year: r.año
+                    });
+
+                    if ((i + 1) % 100 === 0) {
+                        log(i + 1 + '/' + records.length + ' registros...', 'info');
+                    }
+                }
+
+                progress(records.length, records.length);
+
+                // Recalculate totals
+                log('Recalculando totales...', 'info');
+                const ferias = await db.collection('exhibitions').get();
+                for (const feriaDoc of ferias.docs) {
+                    const costs = await db.collection('costs').where('feriaId', '==', feriaDoc.id).get();
+                    let sales = 0, expenses = 0;
+                    for (const costDoc of costs.docs) {
+                        const c = costDoc.data();
+                        if (c.type === 'VENTAS' || c.amount > 0) sales += c.amount;
+                        else expenses += Math.abs(c.amount);
+                    }
+                    await feriaDoc.ref.update({
+                        totalSales: sales,
+                        totalCosts: expenses,
+                        margin: sales - expenses
+                    });
+                }
+
+                log('✓ Importación completada: ' + records.length + ' registros', 'success');
+                status('✅ Datos importados. Abre index.html');
+            } catch(e) {
+                log('✗ Error: ' + e.message, 'error');
+                status('❌ Error: ' + e.message);
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html class="dark" lang="es">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Demostra - Gestor de Costes de Ferias</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#d4af37",
+                        "background-light": "#f6f6f8",
+                        "background-dark": "#0a0c10",
+                        "card-dark": "#161b22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .gold-gradient { background: linear-gradient(135deg, #d4af37 0%, #f1d592 100%); }
+        .expense { color: #ef4444; }
+        .income { color: #10b981; }
+        .status-badge {
+            @apply text-xs font-bold px-3 py-1 rounded-full;
+        }
+        .status-pagado { @apply bg-green-500/10 text-green-600; }
+        .status-cobrado { @apply bg-green-500/10 text-green-600; }
+        .status-entregado { @apply bg-blue-500/10 text-blue-600; }
+        .status-facturado { @apply bg-purple-500/10 text-purple-600; }
+        .status-pedido { @apply bg-yellow-500/10 text-yellow-600; }
+        .status-pendiente { @apply bg-red-500/10 text-red-600; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; justify-content: center; align-items: center; }
+        .modal.active { display: flex; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen">
+
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+    <!-- Header -->
+    <header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-4 bg-background-light dark:bg-background-dark sticky top-0 z-50">
+        <div class="flex items-center gap-3">
+            <div class="size-8 text-primary">
+                <svg fill="currentColor" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M24 4H42V17.3333V30.6667H24V44H6V30.6667V17.3333H24V4Z" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Demostra <span class="text-primary">Costes</span></h1>
+        </div>
+    </header>
+
+    <div class="flex flex-1">
+        <!-- Main Content -->
+        <main class="flex-1 p-6 lg:p-10 overflow-y-auto">
+            <div class="max-w-7xl mx-auto">
+
+                <!-- Sección: Crear Feria -->
+                <section class="mb-12">
+                    <div class="flex items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span class="w-2 h-8 bg-primary rounded-full"></span>
+                                Crear Nueva Feria
+                            </h2>
+                            <p class="text-slate-500 dark:text-slate-400 mt-2">Define una nueva feria y selecciona el cliente</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <form id="exhibitionForm" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nombre Feria *</label>
+                                <input type="text" id="exhName" placeholder="ej: Seafood Barcelona" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Fecha *</label>
+                                <input type="date" id="exhDate" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Año *</label>
+                                <select id="exhYear" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                                    <option value="2025">2025</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2027">2027</option>
+                                    <option value="2028">2028</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Cliente *</label>
+                                <div class="flex gap-2">
+                                    <select id="clientSelect" class="flex-1 px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                                        <option value="">-- Seleccionar Cliente --</option>
+                                    </select>
+                                    <button type="button" onclick="openNewClientModal()" class="px-4 py-2 rounded-lg bg-primary text-background-dark font-bold hover:brightness-110 transition-all" title="Crear nuevo cliente">
+                                        <span class="material-symbols-outlined text-[20px]">add</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="md:col-span-2 flex gap-3 items-end">
+                                <button type="submit" class="flex-1 px-6 py-2 rounded-lg bg-primary text-background-dark font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+                                    <span class="material-symbols-outlined">add</span> Crear Feria
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Sección: Seleccionar Feria -->
+                <section class="mb-12">
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
+                        <span class="w-2 h-8 bg-primary rounded-full"></span>
+                        Seleccionar Feria para Costes
+                    </h2>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="md:col-span-3">
+                            <select id="exhibitionSelect" onchange="loadExhibitionCosts()" class="w-full px-4 py-3 rounded-lg bg-slate-100 dark:bg-card-dark border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 text-lg font-bold">
+                                <option value="">-- Seleccionar Feria --</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Grid de Ferias disponibles -->
+                    <div id="exhibitionsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+                </section>
+
+                <!-- Sección: Registrar Coste/Venta (Solo si hay feria seleccionada) -->
+                <section id="costSection" class="mb-12 hidden">
+                    <div class="flex items-center justify-between gap-4 mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
+                                <span class="w-2 h-8 bg-primary rounded-full"></span>
+                                Registrar Coste/Venta
+                            </h2>
+                            <p id="currentExhibitionInfo" class="text-slate-500 dark:text-slate-400 mt-2">Feria seleccionada: -</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <form id="costForm" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Descripción *</label>
+                                <input type="text" id="costDescription" placeholder="ej: Carpintería stand" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Proveedor</label>
+                                <input type="text" id="costProvider" placeholder="ej: Empresa X" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100">
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Importe (€) *</label>
+                                <input type="number" id="costAmount" step="0.01" placeholder="0.00" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Tipo *</label>
+                                <select id="costType" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="GASTO">GASTO (Rojo)</option>
+                                    <option value="INGRESO">INGRESO (Verde)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Categoría *</label>
+                                <select id="costCategory" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="CARPINTERIA">CARPINTERIA</option>
+                                    <option value="MONTAJE">MONTAJE</option>
+                                    <option value="ELECTRICIDAD">ELECTRICIDAD</option>
+                                    <option value="TRANSPORTE">TRANSPORTE</option>
+                                    <option value="SERVICIOS FERIALES">SERVICIOS FERIALES</option>
+                                    <option value="MATERIAL">MATERIAL</option>
+                                    <option value="GRAFICA">GRAFICA</option>
+                                    <option value="GASTOS VIAJE">GASTOS VIAJE</option>
+                                    <option value="GENERAL">GENERAL</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Estado *</label>
+                                <select id="costStatus" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+                                    <option value="">-- Seleccionar --</option>
+                                    <option value="PAGADO">PAGADO ✓</option>
+                                    <option value="COBRADO">COBRADO ✓</option>
+                                    <option value="ENTREGADO">ENTREGADO</option>
+                                    <option value="FACTURADO">FACTURADO</option>
+                                    <option value="PEDIDO">PEDIDO</option>
+                                    <option value="PENDIENTE">PENDIENTE</option>
+                                </select>
+                            </div>
+
+                            <div class="md:col-span-3 flex gap-3">
+                                <button type="submit" class="flex-1 px-6 py-2 rounded-lg bg-primary text-background-dark font-bold hover:brightness-110 transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2">
+                                    <span class="material-symbols-outlined">add</span> Registrar
+                                </button>
+                                <button type="reset" class="flex-1 px-6 py-2 rounded-lg border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+                                    Limpiar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Sección: Tabla de Costes/Ventas -->
+                <section id="costsTableSection" class="hidden">
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2 mb-6">
+                        <span class="w-2 h-8 bg-primary rounded-full"></span>
+                        Detalle de Costes y Ventas
+                    </h2>
+
+                    <!-- Panel de Totales -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase mb-2">Total Ingresos</p>
+                            <p id="totalIngresos" class="text-3xl font-black income">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase mb-2">Total Gastos</p>
+                            <p id="totalGastos" class="text-3xl font-black expense">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase mb-2">Margen Acumulado</p>
+                            <p id="totalMargin" class="text-3xl font-black text-primary">€0</p>
+                        </div>
+                        <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800">
+                            <p class="text-slate-500 dark:text-slate-400 text-sm font-bold uppercase mb-2">Margen %</p>
+                            <p id="marginPercent" class="text-3xl font-black text-primary">0%</p>
+                        </div>
+                    </div>
+
+                    <!-- Tabla de Costes -->
+                    <div class="bg-slate-100 dark:bg-card-dark p-8 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-x-auto">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="border-b border-slate-200 dark:border-slate-700">
+                                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Fecha</th>
+                                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Descripción</th>
+                                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Proveedor</th>
+                                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Categoría</th>
+                                    <th class="text-right py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Importe</th>
+                                    <th class="text-left py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Estado</th>
+                                    <th class="text-center py-3 px-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="costsTableBody">
+                                <tr><td colspan="7" class="text-center py-4 text-slate-500">Cargando...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- MODALS -->
+<!-- Modal: Crear Cliente -->
+<div id="newClientModal" class="modal">
+    <div class="bg-background-light dark:bg-card-dark rounded-2xl p-8 w-96 fade-in">
+        <h3 class="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">Crear Nuevo Cliente</h3>
+        <form id="newClientForm" onsubmit="saveNewClient(event)">
+            <div class="mb-6">
+                <label class="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">Nombre del Cliente *</label>
+                <input type="text" id="newClientName" placeholder="ej: Empresa XYZ" class="w-full px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-slate-100" required>
+            </div>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeModal('newClientModal')" class="flex-1 px-4 py-2 rounded-lg border border-slate-200 dark:border-slate-700 font-bold hover:bg-slate-100 dark:hover:bg-slate-800">Cancelar</button>
+                <button type="submit" class="flex-1 px-4 py-2 rounded-lg bg-primary text-background-dark font-bold hover:brightness-110">Crear</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let currentExhibitionId = null;
+let allClients = [];
+let currentCosts = [];
+
+// ========== UTILIDADES ==========
+function formatCurrency(value) {
+    return new Intl.NumberFormat('es-ES', {
+        style: 'currency',
+        currency: 'EUR',
+        maximumFractionDigits: 2
+    }).format(value);
+}
+
+function showNotification(message, type = 'success') {
+    const notification = document.createElement('div');
+    notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg text-white font-bold z-50 fade-in ${
+        type === 'success' ? 'bg-green-500' : 'bg-red-500'
+    }`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
+function openModal(modalId) {
+    document.getElementById(modalId).classList.add('active');
+}
+
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+}
+
+function openNewClientModal() {
+    document.getElementById('newClientName').value = '';
+    openModal('newClientModal');
+}
+
+// ========== CARGAR CLIENTES ==========
+async function loadClients() {
+    try {
+        const response = await fetch(`${API_BASE}/api/clients/list`);
+        const data = await response.json();
+        if (data.success) {
+            allClients = data.clients;
+            updateClientSelect();
+        }
+    } catch (error) {
+        console.error('Error cargando clientes:', error);
+    }
+}
+
+function updateClientSelect() {
+    const select = document.getElementById('clientSelect');
+    select.innerHTML = '<option value="">-- Seleccionar Cliente --</option>';
+    allClients.forEach(client => {
+        select.innerHTML += `<option value="${client.id}">${client.name}</option>`;
+    });
+}
+
+async function saveNewClient(event) {
+    event.preventDefault();
+    const name = document.getElementById('newClientName').value;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/clients/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            closeModal('newClientModal');
+            loadClients();
+            showNotification(`Cliente "${name}" creado exitosamente`);
+        }
+    } catch (error) {
+        showNotification('Error al crear cliente', 'error');
+        console.error(error);
+    }
+}
+
+// ========== CARGAR FERIAS ==========
+async function loadExhibitions() {
+    try {
+        const year = document.getElementById('exhYear').value || '2026';
+        const response = await fetch(`${API_BASE}/api/exhibitions/list?year=${year}`);
+        const data = await response.json();
+
+        if (data.success) {
+            displayExhibitions(data.exhibitions);
+            updateExhibitionSelect(data.exhibitions);
+        }
+    } catch (error) {
+        console.error('Error cargando ferias:', error);
+    }
+}
+
+function displayExhibitions(exhibitions) {
+    const grid = document.getElementById('exhibitionsGrid');
+    grid.innerHTML = '';
+
+    if (exhibitions.length === 0) {
+        grid.innerHTML = '<p class="col-span-3 text-center text-slate-500">No hay ferias creadas aún</p>';
+        return;
+    }
+
+    exhibitions.forEach(ex => {
+        const marginPercent = ex.totalSales > 0 ? ((ex.margin / ex.totalSales) * 100).toFixed(1) : 0;
+        const marginColor = marginPercent >= 40 ? 'text-green-500' : marginPercent >= 20 ? 'text-yellow-500' : 'text-red-500';
+
+        grid.innerHTML += `
+            <div class="bg-slate-100 dark:bg-card-dark p-6 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-primary/50 cursor-pointer transition-all" onclick="selectExhibition('${ex.id}')">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <p class="text-slate-500 dark:text-slate-400 text-xs font-bold uppercase mb-1">${ex.id}</p>
+                        <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">${ex.name}</h3>
+                    </div>
+                    <span class="text-2xl ${marginColor} font-black">${marginPercent}%</span>
+                </div>
+                <p class="text-slate-600 dark:text-slate-400 text-sm mb-4">${ex.client}</p>
+                <div class="grid grid-cols-3 gap-3 text-center border-t border-slate-200 dark:border-slate-700 pt-4">
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase font-bold">Ingresos</p>
+                        <p class="font-bold income">${formatCurrency(ex.totalSales || 0)}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase font-bold">Gastos</p>
+                        <p class="font-bold expense">${formatCurrency(ex.totalCosts || 0)}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-slate-500 uppercase font-bold">Margen</p>
+                        <p class="font-bold text-primary">${formatCurrency(ex.margin || 0)}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+}
+
+function updateExhibitionSelect(exhibitions) {
+    const select = document.getElementById('exhibitionSelect');
+    select.innerHTML = '<option value="">-- Seleccionar Feria --</option>';
+    exhibitions.forEach(ex => {
+        select.innerHTML += `<option value="${ex.id}">${ex.name} (${ex.id})</option>`;
+    });
+}
+
+// ========== CREAR FERIA ==========
+document.getElementById('exhibitionForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('exhName').value;
+    const date = document.getElementById('exhDate').value;
+    const year = document.getElementById('exhYear').value;
+    const clientId = document.getElementById('clientSelect').value;
+
+    if (!clientId) {
+        showNotification('Debe seleccionar un cliente', 'error');
+        return;
+    }
+
+    const client = allClients.find(c => c.id === clientId);
+
+    try {
+        const response = await fetch(`${API_BASE}/api/exhibitions/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name,
+                date,
+                year,
+                client: client.name
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('exhibitionForm').reset();
+            loadExhibitions();
+            showNotification(`Feria "${name}" creada exitosamente`);
+        }
+    } catch (error) {
+        showNotification('Error al crear feria', 'error');
+        console.error(error);
+    }
+});
+
+// ========== SELECCIONAR FERIA ==========
+function selectExhibition(exhibitionId) {
+    document.getElementById('exhibitionSelect').value = exhibitionId;
+    loadExhibitionCosts();
+}
+
+async function loadExhibitionCosts() {
+    const exhibitionId = document.getElementById('exhibitionSelect').value;
+
+    if (!exhibitionId) {
+        document.getElementById('costSection').classList.add('hidden');
+        document.getElementById('costsTableSection').classList.add('hidden');
+        return;
+    }
+
+    currentExhibitionId = exhibitionId;
+    document.getElementById('costSection').classList.remove('hidden');
+    document.getElementById('costsTableSection').classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${API_BASE}/api/costs/list?exhibitionId=${exhibitionId}`);
+        const data = await response.json();
+
+        if (data.success) {
+            currentCosts = data.costs;
+            displayCosts(data.costs, data.totals);
+
+            // Actualizar info
+            const exSelect = document.getElementById('exhibitionSelect');
+            const exName = exSelect.options[exSelect.selectedIndex]?.text;
+            document.getElementById('currentExhibitionInfo').textContent = `Feria seleccionada: ${exName}`;
+        }
+    } catch (error) {
+        console.error('Error cargando costes:', error);
+    }
+}
+
+function displayCosts(costs, totals) {
+    const tbody = document.getElementById('costsTableBody');
+    tbody.innerHTML = '';
+
+    if (costs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-slate-500">No hay costes/ventas registradas aún</td></tr>';
+    } else {
+        costs.forEach(cost => {
+            const date = new Date(cost.createdAt).toLocaleDateString('es-ES');
+            const isIncome = cost.type === 'INGRESO';
+            const amountClass = isIncome ? 'income' : 'expense';
+            const amountSign = isIncome ? '+' : '-';
+
+            tbody.innerHTML += `
+                <tr class="border-b border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                    <td class="py-3 px-4">${date}</td>
+                    <td class="py-3 px-4"><strong>${cost.description}</strong></td>
+                    <td class="py-3 px-4 text-sm text-slate-500">${cost.provider}</td>
+                    <td class="py-3 px-4 text-sm">${cost.category}</td>
+                    <td class="py-3 px-4 text-right font-bold ${amountClass}">${amountSign}${formatCurrency(cost.amount)}</td>
+                    <td class="py-3 px-4"><span class="status-badge status-${cost.status.toLowerCase()}">${cost.status}</span></td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="deleteCost('${cost.id}')" class="text-red-500 hover:text-red-700 font-bold transition-colors" title="Eliminar">
+                            <span class="material-symbols-outlined text-[18px]" style="display: inline;">delete</span>
+                        </button>
+                    </td>
+                </tr>
+            `;
+        });
+    }
+
+    // Actualizar totales
+    document.getElementById('totalIngresos').textContent = formatCurrency(totals.totalIngresos);
+    document.getElementById('totalGastos').textContent = formatCurrency(totals.totalGastos);
+    document.getElementById('totalMargin').textContent = formatCurrency(totals.margin);
+    document.getElementById('marginPercent').textContent = `${totals.marginPercent}%`;
+}
+
+// ========== CREAR COSTE/VENTA ==========
+document.getElementById('costForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const description = document.getElementById('costDescription').value;
+    const provider = document.getElementById('costProvider').value;
+    const amount = parseFloat(document.getElementById('costAmount').value);
+    const type = document.getElementById('costType').value;
+    const category = document.getElementById('costCategory').value;
+    const status = document.getElementById('costStatus').value;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/costs/create`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                exhibitionId: currentExhibitionId,
+                description,
+                provider,
+                amount,
+                type,
+                category,
+                status
+            })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            document.getElementById('costForm').reset();
+            loadExhibitionCosts();
+            showNotification('Coste/Venta registrado exitosamente');
+        }
+    } catch (error) {
+        showNotification('Error al registrar coste', 'error');
+        console.error(error);
+    }
+});
+
+// ========== ELIMINAR COSTE ==========
+async function deleteCost(costId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar este coste?')) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/costs/delete?costId=${costId}`, {
+            method: 'DELETE'
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            loadExhibitionCosts();
+            showNotification('Coste eliminado exitosamente');
+        }
+    } catch (error) {
+        showNotification('Error al eliminar coste', 'error');
+        console.error(error);
+    }
+}
+
+// ========== INICIALIZACIÓN ==========
+window.addEventListener('load', () => {
+    loadClients();
+    loadExhibitions();
+});
+
+// Recargar ferias al cambiar año
+document.getElementById('exhYear')?.addEventListener('change', loadExhibitions);
+</script>
+
+</body>
+</html>
