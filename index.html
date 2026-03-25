@@ -1656,11 +1656,11 @@ async function buildCargaFilters() {
   // Ferias
   if (cSelYear !== null) {
     const ferias = [...new Set(allFerias.filter(f => f.year === cSelYear).map(f => f.name).filter(Boolean))].sort();
-    renderChips('cChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===cSelFeria, f=>{
+    renderChips('cChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===cSelFeria, async f=>{
       cSelFeria = f;
       cSelCliente = null;
       document.getElementById('cRowCliente').style.display = f !== null ? 'flex' : 'none';
-      buildCargaFilters();
+      await buildCargaFilters();
     });
   } else {
     document.getElementById('cChipsFeria').innerHTML = '';
@@ -1724,9 +1724,9 @@ async function buildCargaFilters() {
         chip.style.cssText = cSelCliente === client.id
           ? 'background:#e3a017;color:white;border:1px solid #e3a017;'
           : 'background:#ffffff;color:#1f2937;border:1px solid #e5e7eb;';
-        chip.onclick = () => {
+        chip.onclick = async () => {
           cSelCliente = client.id;
-          buildCargaFilters();
+          await buildCargaFilters();
         };
         sec1Chips.appendChild(chip);
       });
