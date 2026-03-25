@@ -1020,8 +1020,8 @@ const db = firebase.firestore();
 
 // Categorías de costos permitidas
 const COST_CATEGORIES = [
+  'ALQUILER',
   'CARPINTERIA',
-  'MONTAJE',
   'MATERIAL',
   'TRANSPORTE',
   'GASTOS VIAJE',
@@ -1030,6 +1030,7 @@ const COST_CATEGORIES = [
   'MOB COMPRA',
   'ELECTRICIDAD',
   'SERVICIOS FERIALES',
+  'COMPRA',
   'OTROS'
 ];
 
@@ -1135,29 +1136,44 @@ function getClientName(clientId) {
 }
 
 // Migración automática: reclasificar TODOS los costos con nueva lógica
+// Esta función FUERZA la reclasificación de todos los costos
 async function migrateAllCosts() {
   let migrated = 0;
   const updates = [];
 
+  console.log('🔄 Iniciando migración de categorías para ' + allCosts.length + ' costos...');
+
   for (const cost of allCosts) {
-    // Reclasificar TODOS los costos con la nueva lógica inteligente
+    // FORZAR reclasificación de TODOS los costos con la nueva lógica inteligente
+    // Ignorar el type2 existente si no es confiable
     const newCategory = autoCategorizeExpense(cost);
+
+    // Si la categoría antigua era OTROS o si cambió, actualizar
     if (cost.type2 !== newCategory) {
+      const oldCat = cost.type2 || 'SIN_CATEGORÍA';
       cost.type2 = newCategory;
-      updates.push({ id: cost.id, type2: newCategory });
+      updates.push({ id: cost.id, type2: newCategory, oldCategory: oldCat });
       migrated++;
     }
   }
 
   // Guardar actualizaciones en Firestore en background (sin esperar)
   if (updates.length > 0) {
+    console.log('📝 Guardando ' + migrated + ' reclasificaciones en Firestore...');
     updates.forEach(update => {
-      db.collection('costs').doc(update.id).update({ type2: update.type2 }).catch(e => {
-        console.error('Error migrando costo ' + update.id + ':', e);
+      db.collection('costs').doc(update.id).update({
+        type2: update.type2,
+        migratedAt: new Date().toISOString()
+      }).catch(e => {
+        console.error('❌ Error migrando costo ' + update.id + ' (' + update.oldCategory + ' → ' + update.type2 + '):', e);
       });
     });
-    console.log('Migración completada: ' + migrated + ' costos actualizados');
+    console.log('✅ Migración completada: ' + migrated + ' costos actualizados en Firestore');
+  } else {
+    console.log('ℹ️ Todos los costos ya están correctamente categorizados');
   }
+
+  return migrated;
 }
 
 async function init() {
@@ -1203,47 +1219,110 @@ function enrichCostsWithType2() {
 }
 
 function autoCategorizeExpense(cost) {
-  // Intentar usar categorías existentes primero
-  if (cost.category && cost.category !== 'GENERAL' && cost.category !== '' && COST_CATEGORIES.includes(cost.category)) {
-    return cost.category;
-  }
-  if (cost.tipo && cost.tipo !== '' && cost.tipo !== 'GASTO' && cost.tipo !== 'VENTAS' && COST_CATEGORIES.includes(cost.tipo)) {
-    return cost.tipo;
+  // PASO 0: Si ya tiene categoría válida asignada, respetarla
+  if (cost.type2 && COST_CATEGORIES.includes(cost.type2)) {
+    return cost.type2;
   }
 
   const desc = (cost.description || '').toLowerCase();
   const prov = (cost.provider || '').toLowerCase();
   const fullText = desc + ' ' + prov;
 
-  // PASO 1: Búsqueda EXACTA de proveedores conocidos (máxima prioridad)
-  const providerMappings = {
-    'ALQUILER': ['interlift', 'raloe', 'eurobandas', 'granichan', 'granilouro', 'uprent', 'euromac'],
-    'TRANSPORTE': ['agorared', 'agora', 'camion', 'flete'],
-    'COMPRA': ['pacprint', 'cristian', 'microdent'],
-    'GRAFICA': ['pacprint'],
-    'CARPINTERIA': ['carpintero', 'taller'],
+  // PASO 1: MAPEO EXPLÍCITO DE PROVEEDORES (máxima prioridad)
+  // Este diccionario debe tener TODOS los proveedores conocidos
+  const PROVIDER_CATEGORY_MAP = {
+    // ALQUILER - Empresas de alquiler
+    'interlift': 'ALQUILER',
+    'raloe': 'ALQUILER',
+    'eurobandas': 'ALQUILER',
+    'granichan': 'ALQUILER',
+    'granilouro': 'ALQUILER',
+    'uprent': 'ALQUILER',
+    'euromac': 'ALQUILER',
+    'estudio montaje': 'ALQUILER',
+    'estructura': 'ALQUILER',
+    'andamio': 'ALQUILER',
+    'stand alquiler': 'ALQUILER',
+
+    // TRANSPORTE - Logística y flete
+    'agoraed': 'TRANSPORTE',
+    'agora': 'TRANSPORTE',
+    'agorared': 'TRANSPORTE',
+    'transportes': 'TRANSPORTE',
+    'logística': 'TRANSPORTE',
+    'camión': 'TRANSPORTE',
+    'flete': 'TRANSPORTE',
+
+    // GRÁFICA - Impresión y diseño
+    'pacprint': 'GRAFICA',
+    'pprint': 'GRAFICA',
+    'imprenta': 'GRAFICA',
+    'impresión': 'GRAFICA',
+    'diseño': 'GRAFICA',
+    'serigrafía': 'GRAFICA',
+
+    // COMPRA - Suministros y compras directas
+    'cristian': 'COMPRA',
+    'microdent': 'COMPRA',
+    'suministro': 'COMPRA',
+    'repuesto': 'COMPRA',
+
+    // CARPINTERÍA
+    'carpintero': 'CARPINTERIA',
+    'taller madera': 'CARPINTERIA',
+    'carpintería': 'CARPINTERIA',
+
+    // SERVICIOS FERIALES
+    'feria': 'SERVICIOS FERIALES',
+    'expo': 'SERVICIOS FERIALES',
+    'evento': 'SERVICIOS FERIALES',
   };
 
-  for (const [cat, providers] of Object.entries(providerMappings)) {
-    for (const p of providers) {
-      if (prov.includes(p)) {
-        return cat;
-      }
+  // Buscar coincidencia exacta con proveedores mapeados
+  for (const [provider, category] of Object.entries(PROVIDER_CATEGORY_MAP)) {
+    if (prov.includes(provider)) {
+      return category;
     }
   }
 
   // PASO 2: Búsqueda de palabras clave en descripción y proveedor
   const patterns = {
-    'ALQUILER': ['alquiler', 'renta', 'stand', 'estructura', 'andamio', 'montaje estructura'],
-    'TRANSPORTE': ['transporte', 'camion', 'envio', 'flete', 'logistica', 'carga', 'descarga'],
-    'COMPRA': ['compra', 'suministro', 'repuesto'],
-    'GRAFICA': ['impresión', 'impresion', 'diseño', 'rotulo', 'cartel', 'lona', 'print', 'serigraf'],
-    'GASTOS VIAJE': ['hotel', 'viaje', 'gasolina', 'peaje', 'hospedaje', 'combustible', 'carretera'],
-    'SERVICIOS FERIALES': ['feria', 'evento', 'servicio', 'montaje', 'expo', 'stand servicio'],
-    'CARPINTERIA': ['madera', 'carpint', 'corte', 'sierra', 'taller madera', 'mueble estructura'],
-    'ELECTRICIDAD': ['electrico', 'cable', 'generador', 'luz', 'corriente', 'enchuf', 'amplificador'],
-    'MATERIAL': ['material', 'acero', 'tubo', 'pintura', 'lona', 'tela', 'papel', 'carton', 'vinyl', 'pvc'],
-    'GASTOS GG': ['comida', 'café', 'teléfono', 'papelería', 'misc', 'otros gasto'],
+    'ALQUILER': [
+      'alquiler', 'renta', 'rental', 'stand', 'estructura', 'andamio',
+      'montaje estructura', 'alq', 'arrendamiento', 'leasing'
+    ],
+    'TRANSPORTE': [
+      'transporte', 'camión', 'flete', 'logística', 'carga', 'descarga',
+      'envío', 'shipping', 'logistic', 'entrega'
+    ],
+    'COMPRA': [
+      'compra', 'suministro', 'repuesto', 'suministros', 'adquisición',
+      'purchasing', 'acquisition'
+    ],
+    'GRAFICA': [
+      'impresión', 'impresion', 'diseño', 'rotulo', 'cartel', 'lona',
+      'print', 'serigraf', 'gráfica', 'design', 'vinyl', 'banner'
+    ],
+    'GASTOS VIAJE': [
+      'hotel', 'viaje', 'gasolina', 'peaje', 'hospedaje', 'combustible',
+      'carretera', 'gasolinera', 'alojamiento', 'viático', 'tren', 'avión'
+    ],
+    'SERVICIOS FERIALES': [
+      'feria', 'evento', 'servicio feria', 'expo', 'stand servicio',
+      'conferencia', 'congreso', 'exhibition', 'fair'
+    ],
+    'CARPINTERIA': [
+      'madera', 'carpint', 'corte', 'sierra', 'taller madera',
+      'mueble estructura', 'ebanista', 'carpentry', 'wood'
+    ],
+    'ELECTRICIDAD': [
+      'eléctrico', 'electrico', 'cable', 'generador', 'luz',
+      'corriente', 'enchuf', 'amplificador', 'electrical', 'power'
+    ],
+    'MATERIAL': [
+      'material', 'acero', 'tubo', 'pintura', 'tela', 'papel',
+      'cartón', 'vinyl', 'pvc', 'metal', 'supplies', 'material prima'
+    ],
   };
 
   for (const [cat, keywords] of Object.entries(patterns)) {
@@ -1252,6 +1331,11 @@ function autoCategorizeExpense(cost) {
         return cat;
       }
     }
+  }
+
+  // PASO 3: Fallback por tipo de gasto (si existe field 'type')
+  if (cost.type && COST_CATEGORIES.includes(cost.type)) {
+    return cost.type;
   }
 
   return 'OTROS';
@@ -2171,8 +2255,8 @@ function renderCargaForm() {
           <div class="form-field">
             <label>Categoría</label>
             <select id="cargaTipo2">
+              <option>ALQUILER</option>
               <option>CARPINTERIA</option>
-              <option>MONTAJE</option>
               <option>MATERIAL</option>
               <option>TRANSPORTE</option>
               <option>GASTOS VIAJE</option>
@@ -2181,6 +2265,7 @@ function renderCargaForm() {
               <option>MOB COMPRA</option>
               <option>ELECTRICIDAD</option>
               <option>SERVICIOS FERIALES</option>
+              <option>COMPRA</option>
               <option>OTROS</option>
             </select>
           </div>
