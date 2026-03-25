@@ -783,9 +783,10 @@ tr:hover { background:#f3f4f6; }
               </div>
               <div class="form-field"><label>Categoría</label>
                 <select id="pptoNewTipo2">
-                  <option>VENTA</option><option>CARPINTERIA</option><option>MONTAJE</option>
+                  <option>CARPINTERIA</option><option>MONTAJE</option>
                   <option>MATERIAL</option><option>TRANSPORTE</option><option>GASTOS VIAJE</option>
-                  <option>OTROS</option>
+                  <option>GRAFICA</option><option>MOB ALQ</option><option>MOB COMPRA</option>
+                  <option>ELECTRICIDAD</option><option>SERVICIOS FERIALES</option><option>OTROS</option>
                 </select>
               </div>
               <div class="form-field" style="flex:2"><label>Detalle</label>
@@ -994,6 +995,21 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
+// Categorías de costos permitidas
+const COST_CATEGORIES = [
+  'CARPINTERIA',
+  'MONTAJE',
+  'MATERIAL',
+  'TRANSPORTE',
+  'GASTOS VIAJE',
+  'GRAFICA',
+  'MOB ALQ',
+  'MOB COMPRA',
+  'ELECTRICIDAD',
+  'SERVICIOS FERIALES',
+  'OTROS'
+];
+
 let allFerias = [], allCosts = [];
 let allClients = []; // Cache de clientes para enriquecimiento
 let clientFeriaAssignments = new Map(); // Asignaciones cliente-feria: clientId -> Set de feriaIds
@@ -1094,6 +1110,32 @@ function getClientName(clientId) {
   return client ? client.name : clientId;
 }
 
+// Migración automática: asignar type2 a costos que lo necesitan
+async function migrateAllCosts() {
+  let migrated = 0;
+  const updates = [];
+
+  for (const cost of allCosts) {
+    // Si falta type2 o no es válido, asignar automáticamente
+    if (!cost.type2 || !COST_CATEGORIES.includes(cost.type2)) {
+      const newCategory = autoCategorizeExpense(cost);
+      cost.type2 = newCategory;
+      updates.push({ id: cost.id, type2: newCategory });
+      migrated++;
+    }
+  }
+
+  // Guardar actualizaciones en Firestore en background (sin esperar)
+  if (updates.length > 0) {
+    updates.forEach(update => {
+      db.collection('costs').doc(update.id).update({ type2: update.type2 }).catch(e => {
+        console.error('Error migrando costo ' + update.id + ':', e);
+      });
+    });
+    console.log('Migración completada: ' + migrated + ' costos actualizados');
+  }
+}
+
 async function init() {
   const [fSnap, cSnap, clSnap, assignSnap] = await Promise.all([
     db.collection('exhibitions').get(),
@@ -1115,14 +1157,22 @@ async function init() {
   });
 
   enrichCostsWithType2();
+
+  // Migración automática en background (sin bloquear UI)
+  migrateAllCosts().then(() => {
+    // Al completar migración, recargar vistas
+    enrichCostsWithType2();
+    loadDashboard();
+  });
+
   loadDashboard();
 }
 
-// Enriquecer costos con type2 si falta
+// Enriquecer costos con type2 si falta o es inválido
 function enrichCostsWithType2() {
   allCosts.forEach(c => {
-    // Si no tiene type2, asignar categoría automática
-    if (!c.type2) {
+    // Si no tiene type2 o no es válido, asignar categoría automática
+    if (!c.type2 || !COST_CATEGORIES.includes(c.type2)) {
       c.type2 = autoCategorizeExpense(c);
     }
   });
@@ -1130,10 +1180,10 @@ function enrichCostsWithType2() {
 
 function autoCategorizeExpense(cost) {
   // Intentar usar categorías existentes
-  if (cost.category && cost.category !== 'GENERAL' && cost.category !== '') {
+  if (cost.category && cost.category !== 'GENERAL' && cost.category !== '' && COST_CATEGORIES.includes(cost.category)) {
     return cost.category;
   }
-  if (cost.tipo && cost.tipo !== '' && cost.tipo !== 'GASTO' && cost.tipo !== 'VENTAS') {
+  if (cost.tipo && cost.tipo !== '' && cost.tipo !== 'GASTO' && cost.tipo !== 'VENTAS' && COST_CATEGORIES.includes(cost.tipo)) {
     return cost.tipo;
   }
 
@@ -1152,7 +1202,7 @@ function autoCategorizeExpense(cost) {
     'MOB ALQ': ['alquiler', 'renta', 'mobiliario', 'silla', 'mesa', 'mostrador'],
     'MOB COMPRA': ['compra', 'mueble', 'mostrador compra', 'estanteria'],
     'GASTOS VIAJE': ['viaje', 'hotel', 'hospedaje', 'gasolina', 'combustible', 'peaje'],
-    'GASTOS GG': ['telefono', 'internet', 'seguro', 'administrativo', 'general'],
+    'SERVICIOS FERIALES': ['servicio', 'feria', 'stand', 'exposicion'],
   };
 
   for (const [cat, keywords] of Object.entries(patterns)) {
@@ -2040,6 +2090,7 @@ function renderCargaForm() {
               <option>GASTOS VIAJE</option>
               <option>GRAFICA</option>
               <option>MOB ALQ</option>
+              <option>MOB COMPRA</option>
               <option>ELECTRICIDAD</option>
               <option>SERVICIOS FERIALES</option>
               <option>OTROS</option>
@@ -2089,6 +2140,11 @@ async function saveCargaCost() {
   // Validaciones
   if (!tipo || !tipo2 || !descripcion || !proveedor || importe === 0) {
     alert('Completa todos los campos requeridos');
+    return;
+  }
+
+  if (!COST_CATEGORIES.includes(tipo2)) {
+    alert('Categoría inválida. Selecciona una de las categorías permitidas');
     return;
   }
 
