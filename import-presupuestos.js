@@ -1028,13 +1028,31 @@ async function importPresupuestos() {
       existingMap.set(key, true);
     });
 
+    // Mapear categorías del Excel a categorías del sistema
+    const categoryMap = {
+      'VENTA': 'OTROS',
+      'CARPINTERIA': 'CARPINTERIA',
+      'ELECTRICIDAD': 'ELECTRICIDAD',
+      'PINTURA': 'GRAFICA',
+      'HERRERIA': 'CARPINTERIA',
+      'PLOMERIA': 'SERVICIOS FERIALES',
+      'VIDRIOS': 'MATERIAL',
+      'DECORACION': 'MATERIAL',
+      'TRANSPORTE': 'TRANSPORTE',
+      'INSTALACION': 'SERVICIOS FERIALES',
+      'MANO DE OBRA': 'GASTOS VIAJE',
+      'MATERIALES': 'MATERIAL',
+      'ALQUILER': 'ALQUILER',
+      'SERVICIOS': 'SERVICIOS FERIALES'
+    };
+
     // Procesar cada presupuesto
     for (let i = 0; i < PRESUPUESTOS_SEAFOOD.length; i++) {
       try {
         const ppto = PRESUPUESTOS_SEAFOOD[i];
 
-        // Validar categoría
-        let categoria = ppto.categoria;
+        // Mapear y validar categoría
+        let categoria = categoryMap[ppto.categoria] || 'OTROS';
         if (!COST_CATEGORIES.includes(categoria)) {
           categoria = 'OTROS';
         }
