@@ -1139,15 +1139,15 @@ function getClientName(clientId) {
   return client ? client.name : clientId;
 }
 
-// Migración automática: asignar type2 a costos que lo necesitan
+// Migración automática: reclasificar TODOS los costos con nueva lógica
 async function migrateAllCosts() {
   let migrated = 0;
   const updates = [];
 
   for (const cost of allCosts) {
-    // Si falta type2 o no es válido, asignar automáticamente
-    if (!cost.type2 || !COST_CATEGORIES.includes(cost.type2)) {
-      const newCategory = autoCategorizeExpense(cost);
+    // Reclasificar TODOS los costos con la nueva lógica inteligente
+    const newCategory = autoCategorizeExpense(cost);
+    if (cost.type2 !== newCategory) {
       cost.type2 = newCategory;
       updates.push({ id: cost.id, type2: newCategory });
       migrated++;
@@ -1208,7 +1208,7 @@ function enrichCostsWithType2() {
 }
 
 function autoCategorizeExpense(cost) {
-  // Intentar usar categorías existentes
+  // Intentar usar categorías existentes primero
   if (cost.category && cost.category !== 'GENERAL' && cost.category !== '' && COST_CATEGORIES.includes(cost.category)) {
     return cost.category;
   }
@@ -1216,22 +1216,39 @@ function autoCategorizeExpense(cost) {
     return cost.tipo;
   }
 
-  // Auto-categorizar basado en descripción
   const desc = (cost.description || '').toLowerCase();
   const prov = (cost.provider || '').toLowerCase();
   const fullText = desc + ' ' + prov;
 
+  // PASO 1: Búsqueda EXACTA de proveedores conocidos (máxima prioridad)
+  const providerMappings = {
+    'ALQUILER': ['interlift', 'raloe', 'eurobandas', 'granichan', 'granilouro', 'uprent', 'euromac'],
+    'TRANSPORTE': ['agorared', 'agora', 'camion', 'flete'],
+    'COMPRA': ['pacprint', 'cristian', 'microdent'],
+    'GRAFICA': ['pacprint'],
+    'CARPINTERIA': ['carpintero', 'taller'],
+  };
+
+  for (const [cat, providers] of Object.entries(providerMappings)) {
+    for (const p of providers) {
+      if (prov.includes(p)) {
+        return cat;
+      }
+    }
+  }
+
+  // PASO 2: Búsqueda de palabras clave en descripción y proveedor
   const patterns = {
-    'CARPINTERIA': ['carpint', 'madera', 'corte', 'sierra', 'taller madera'],
-    'MONTAJE': ['montaje', 'estructura', 'montadera', 'armado', 'ensamblaje'],
-    'MATERIAL': ['material', 'lona', 'tela', 'papel', 'carton', 'vinyl', 'pvc'],
-    'TRANSPORTE': ['transport', 'flete', 'logistic', 'carga', 'descarga', 'envio'],
-    'GRAFICA': ['grafica', 'impresion', 'imprenta', 'diseño', 'rotulo', 'serigraf'],
-    'ELECTRICIDAD': ['electric', 'luz', 'corriente', 'cable', 'enchuf', 'amplificador'],
-    'MOB ALQ': ['alquiler', 'renta', 'mobiliario', 'silla', 'mesa', 'mostrador'],
-    'MOB COMPRA': ['compra', 'mueble', 'mostrador compra', 'estanteria'],
-    'GASTOS VIAJE': ['viaje', 'hotel', 'hospedaje', 'gasolina', 'combustible', 'peaje'],
-    'SERVICIOS FERIALES': ['servicio', 'feria', 'stand', 'exposicion'],
+    'ALQUILER': ['alquiler', 'renta', 'stand', 'estructura', 'andamio', 'montaje estructura'],
+    'TRANSPORTE': ['transporte', 'camion', 'envio', 'flete', 'logistica', 'carga', 'descarga'],
+    'COMPRA': ['compra', 'suministro', 'repuesto'],
+    'GRAFICA': ['impresión', 'impresion', 'diseño', 'rotulo', 'cartel', 'lona', 'print', 'serigraf'],
+    'GASTOS VIAJE': ['hotel', 'viaje', 'gasolina', 'peaje', 'hospedaje', 'combustible', 'carretera'],
+    'SERVICIOS FERIALES': ['feria', 'evento', 'servicio', 'montaje', 'expo', 'stand servicio'],
+    'CARPINTERIA': ['madera', 'carpint', 'corte', 'sierra', 'taller madera', 'mueble estructura'],
+    'ELECTRICIDAD': ['electrico', 'cable', 'generador', 'luz', 'corriente', 'enchuf', 'amplificador'],
+    'MATERIAL': ['material', 'acero', 'tubo', 'pintura', 'lona', 'tela', 'papel', 'carton', 'vinyl', 'pvc'],
+    'GASTOS GG': ['comida', 'café', 'teléfono', 'papelería', 'misc', 'otros gasto'],
   };
 
   for (const [cat, keywords] of Object.entries(patterns)) {
