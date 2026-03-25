@@ -1110,8 +1110,9 @@ async function importPresupuestos() {
     importBtn.textContent = 'Importación Completada';
     importBtn.disabled = true;
 
-    // Recargar datos
-    initPresupuestos();
+    // Recargar datos (force reload)
+    pptoLoaded = false;
+    await initPresupuestos();
 
   } catch (err) {
     console.error('Error en importación:', err);
