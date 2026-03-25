@@ -4,24 +4,6 @@
  * Valida duplicados y categorías antes de importar
  */
 
-const COST_CATEGORIES = [
-  'VENTA',
-  'CARPINTERIA',
-  'ELECTRICIDAD',
-  'PINTURA',
-  'HERRERIA',
-  'PLOMERIA',
-  'VIDRIOS',
-  'DECORACION',
-  'TRANSPORTE',
-  'INSTALACION',
-  'MANO DE OBRA',
-  'MATERIALES',
-  'ALQUILER',
-  'SERVICIOS',
-  'OTROS'
-];
-
 // Datos de presupuestos extraídos del Excel SEAFOOD
 // Datos de presupuestos extraídos del Excel SEAFOOD
 const PRESUPUESTOS_SEAFOOD = [
