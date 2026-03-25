@@ -1392,7 +1392,7 @@ function makeGroup(title, costs, color) {
   });
 
   let html = `<div class="group" data-group="${title}" style="margin-bottom:16px;border:1px solid #222;border-radius:6px;overflow:hidden;">`;
-  html += `<div class="group-header" style="padding:12px;background:rgba(0,0,0,0.3);cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="this.parentElement.classList.toggle('expanded');">`;
+  html += `<div class="group-header" style="padding:12px;background:#f3f4f6;cursor:pointer;display:flex;justify-content:space-between;align-items:center;" onclick="this.parentElement.classList.toggle('expanded');">`;
   html += `<div style="display:flex;align-items:center;gap:12px;">`;
   html += `<span style="font-weight:600;color:#1f2937;">${title}</span>`;
   html += `<span style="font-size:12px;color:#4b5563;">${costs.length} items</span>`;
@@ -1402,7 +1402,7 @@ function makeGroup(title, costs, color) {
   html += `<span class="material-symbols-outlined" style="font-size:20px;">expand_more</span>`;
   html += `</div>`;
   html += `</div>`;
-  html += `<div class="group-body" style="display:none;padding:12px;">`;
+  html += `<div class="group-body" style="display:none;padding:12px;background:#f9fafb;">`;
 
   Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).forEach(([tipo, items]) => {
     html += makeTipo(tipo, items);
@@ -1416,27 +1416,42 @@ function makeTipo(tipo, items) {
   let total = 0;
   items.forEach(c => total += Math.abs(parseFloat(c.amount) || 0));
 
+  // Determinar color basado en si es ingreso o gasto
+  const isIngreso = items.length > 0 && (items[0].type === 'VENTAS' || parseFloat(items[0].amount) > 0);
+  const color = isIngreso ? '#10b981' : '#ef4444';
+  const bgColor = isIngreso ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+
   const tipoId = `tipo-${tipo}`;
   let html = `<div style="margin-bottom:8px;border:1px solid #d1d5db;border-radius:4px;overflow:hidden;">`;
-  html += `<div class="tipo-header" data-tipo="${tipo}" style="padding:8px;background:rgba(255,255,255,0.05);cursor:pointer;display:flex;justify-content:space-between;align-items:center;">`;
+  html += `<div class="tipo-header" data-tipo="${tipo}" style="padding:8px;background:${bgColor};cursor:pointer;display:flex;justify-content:space-between;align-items:center;">`;
   html += `<div style="display:flex;align-items:center;gap:12px;">`;
   html += `<span style="font-size:13px;font-weight:500;color:#1f2937;">${tipo}</span>`;
   html += `<span style="font-size:11px;color:#4b5563;">${items.length}</span>`;
   html += `</div>`;
   html += `<div style="display:flex;align-items:center;gap:8px;">`;
-  html += `<span style="font-size:12px;color:#10b981;">${fmt(total)}</span>`;
+  html += `<span style="font-size:12px;color:${color};">${fmt(total)}</span>`;
   html += `<span class="material-symbols-outlined" style="font-size:16px;transition:transform 0.2s ease;">expand_more</span>`;
   html += `</div>`;
   html += `</div>`;
-  html += `<div class="tipo-body" style="display:none;padding:8px;background:rgba(0,0,0,0.2);">`;
+  html += `<div class="tipo-body" style="display:none;padding:8px;background:#f9fafb;">`;
   html += `<table style="width:100%;font-size:11px;border-collapse:collapse;">`;
   html += `<thead style="border-bottom:1px solid #d1d5db;">`;
   html += `<tr style="color:#4b5563;">`;
-  html += `<th style="text-align:left;padding:6px;font-weight:500;">Cliente</th>`;
-  html += `<th style="text-align:left;padding:6px;font-weight:500;">Descripción</th>`;
-  html += `<th style="text-align:left;padding:6px;font-weight:500;">Proveedor</th>`;
-  html += `<th style="text-align:right;padding:6px;font-weight:500;">Importe</th>`;
-  html += `<th style="text-align:left;padding:6px;font-weight:500;">Estado</th>`;
+
+  // Si es gasto, omitir columna "Cliente"
+  if (!isIngreso) {
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Descripción</th>`;
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Proveedor</th>`;
+    html += `<th style="text-align:right;padding:6px;font-weight:500;">Importe</th>`;
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Estado</th>`;
+  } else {
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Cliente</th>`;
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Descripción</th>`;
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Proveedor</th>`;
+    html += `<th style="text-align:right;padding:6px;font-weight:500;">Importe</th>`;
+    html += `<th style="text-align:left;padding:6px;font-weight:500;">Estado</th>`;
+  }
+
   html += `</tr>`;
   html += `</thead>`;
   html += `<tbody>`;
@@ -1448,12 +1463,21 @@ function makeTipo(tipo, items) {
     const status = c.status || '—';
     const amount = Math.abs(parseFloat(c.amount) || 0);
 
-    html += `<tr style="border-bottom:1px solid #222;">`;
-    html += `<td style="padding:6px;">${clientName}</td>`;
-    html += `<td style="padding:6px;">${desc}</td>`;
-    html += `<td style="padding:6px;">${prov}</td>`;
-    html += `<td style="padding:6px;text-align:right;color:#10b981;">${fmt(amount)}</td>`;
-    html += `<td style="padding:6px;">${status}</td>`;
+    html += `<tr style="border-bottom:1px solid #e5e7eb;">`;
+
+    if (!isIngreso) {
+      html += `<td style="padding:6px;">${desc}</td>`;
+      html += `<td style="padding:6px;">${prov}</td>`;
+      html += `<td style="padding:6px;text-align:right;color:${color};">${fmt(amount)}</td>`;
+      html += `<td style="padding:6px;">${status}</td>`;
+    } else {
+      html += `<td style="padding:6px;">${clientName}</td>`;
+      html += `<td style="padding:6px;">${desc}</td>`;
+      html += `<td style="padding:6px;">${prov}</td>`;
+      html += `<td style="padding:6px;text-align:right;color:${color};">${fmt(amount)}</td>`;
+      html += `<td style="padding:6px;">${status}</td>`;
+    }
+
     html += `</tr>`;
   });
 
@@ -1473,12 +1497,14 @@ function showChartSummary(costs) {
     else gas += Math.abs(a);
   });
 
+  // Cuando todo está colapsado: Gastos + Margen (NO Ingresos)
+  const margen = ing - gas;
   const data = [
-    { label: 'Ingresos', value: ing, color: '#10b981' },
-    { label: 'Gastos', value: gas, color: '#ef4444' }
+    { label: 'Gastos', value: gas, color: '#ef4444' },
+    { label: 'Margen', value: Math.max(0, margen), color: '#fbbf24' }
   ];
 
-  drawChart('Ingresos vs Gastos', data, ing + gas);
+  drawChart('Ingresos vs Gastos', data, gas + Math.max(0, margen));
 }
 
 function showChartGroup(title, costs) {
@@ -1528,11 +1554,11 @@ function showChartTipo(tipo, items) {
 function drawChart(title, data, total) {
   document.getElementById('chartTitle').textContent = title;
 
-  // Crear SVG pie/donut chart
+  // Crear SVG pie/donut chart (sin centro pintado)
   const svg = document.getElementById('chartSvg');
   svg.innerHTML = '';
 
-  const cx = 100, cy = 100, r = 80, rInner = 50;
+  const cx = 100, cy = 100, r = 80;
   let currentAngle = -Math.PI / 2;
 
   data.forEach(item => {
@@ -1552,22 +1578,29 @@ function drawChart(title, data, total) {
     path.setAttribute('stroke-width', '2');
     svg.appendChild(path);
 
-    // Inner circle para donut
-    const ix1 = cx + rInner * Math.cos(currentAngle);
-    const iy1 = cy + rInner * Math.sin(currentAngle);
-    const ix2 = cx + rInner * Math.cos(currentAngle + angle);
-    const iy2 = cy + rInner * Math.sin(currentAngle + angle);
+    // Mostrar etiqueta de porcentaje si es relevante (especialmente para margen)
+    if (item.label === 'Margen' && total > 0) {
+      const pct = Math.round((item.value / total) * 100);
+      const labelAngle = currentAngle + angle / 2;
+      const labelX = cx + (r * 0.6) * Math.cos(labelAngle);
+      const labelY = cy + (r * 0.6) * Math.sin(labelAngle);
 
-    const innerPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const innerD = `M ${ix1} ${iy1} A ${rInner} ${rInner} 0 ${largeArc} 1 ${ix2} ${iy2} Z`;
-    innerPath.setAttribute('d', innerD);
-    innerPath.setAttribute('fill', '#ffffff');
-    svg.appendChild(innerPath);
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', labelX);
+      text.setAttribute('y', labelY);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('dominant-baseline', 'central');
+      text.setAttribute('fill', '#000000');
+      text.setAttribute('font-size', '12');
+      text.setAttribute('font-weight', '600');
+      text.textContent = `${pct}%`;
+      svg.appendChild(text);
+    }
 
     currentAngle += angle;
   });
 
-  // Llenar leyenda
+  // Llenar leyenda con colores correctos y emojis
   const legend = document.getElementById('chartLegend');
   legend.innerHTML = '';
 
@@ -1577,22 +1610,24 @@ function drawChart(title, data, total) {
     div.style.alignItems = 'center';
     div.style.gap = '8px';
 
-    const color = document.createElement('span');
-    color.style.width = '12px';
-    color.style.height = '12px';
-    color.style.borderRadius = '2px';
-    color.style.backgroundColor = item.color;
+    const emoji = document.createElement('span');
+    emoji.style.fontSize = '16px';
+    if (item.label === 'Gastos') emoji.textContent = '🔴';
+    else if (item.label === 'Margen') emoji.textContent = '🟡';
+    else if (item.label === 'Ingresos') emoji.textContent = '🟢';
+    else emoji.style.display = 'none';
 
     const label = document.createElement('span');
     label.style.flex = '1';
     label.textContent = item.label;
-    label.style.color = '#e5e7eb';
+    label.style.color = '#000000';
+    label.style.fontWeight = '500';
 
     const value = document.createElement('span');
     value.style.color = '#4b5563';
     value.textContent = fmt(item.value);
 
-    div.appendChild(color);
+    if (emoji.textContent) div.appendChild(emoji);
     div.appendChild(label);
     div.appendChild(value);
     legend.appendChild(div);
