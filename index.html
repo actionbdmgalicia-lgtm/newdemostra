@@ -2589,7 +2589,14 @@ function buildPptoMatrixTable() {
       catTotal += value;
       gastoTotal += value;
 
-      html += `<tr style="background:#ffffff;"><td style="padding:10px;border:1px solid #e5e7eb;padding-left:${catPrincipal === item ? '30px' : '50px'};color:#4b5563;">${item}</td>`;
+      html += `<tr style="background:#ffffff;"><td style="padding:10px;border:1px solid #e5e7eb;padding-left:${catPrincipal === item ? '30px' : '50px'};color:#4b5563;">${item}`;
+
+      // Add calculator button for MONTAJE items
+      if (item === 'MONTAJE') {
+        html += ` <button onclick="openMontajeCalculator((val) => { updatePptoMatrix('${key}', val); })" style="margin-left:12px;padding:4px 10px;background:#3b82f6;color:#ffffff;border:none;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;">🧮 Calc</button>`;
+      }
+
+      html += `</td>`;
       html += `<td style="padding:10px;border:1px solid #e5e7eb;text-align:right;"><input type="number" step="0.01" value="${value}" data-key="${key}" onchange="updatePptoMatrix('${key}', this.value)" style="width:120px;padding:6px;border:1px solid #e5e7eb;border-radius:0;background:#f8f9fa;" /></td></tr>`;
     });
   });
@@ -3212,7 +3219,167 @@ async function applyDistribution() {
 }
 
 window.addEventListener('load', init);
+
+// ── MONTAJE CALCULATOR ──
+let montajeCallback = null;
+
+function openMontajeCalculator(callback) {
+  montajeCallback = callback;
+  const modal = document.getElementById('montajeModal');
+  if (modal) {
+    modal.style.display = 'flex';
+    // Reset form
+    document.getElementById('montajePersonas').value = '';
+    document.getElementById('montajeDias').value = '';
+    document.getElementById('montajeTasa').value = '';
+    document.getElementById('montajeDesplazamiento').value = '';
+    document.getElementById('montajeHotel').value = '';
+    document.getElementById('montajeComida').value = '';
+    document.getElementById('montajeResultado').innerHTML = '';
+    document.getElementById('montajeDesglose').innerHTML = '';
+  }
+}
+
+function closeMontajeCalculator() {
+  const modal = document.getElementById('montajeModal');
+  if (modal) {
+    modal.style.display = 'none';
+  }
+  montajeCallback = null;
+}
+
+function calculateMontaje() {
+  const personas = parseFloat(document.getElementById('montajePersonas').value) || 0;
+  const dias = parseFloat(document.getElementById('montajeDias').value) || 0;
+  const tasa = parseFloat(document.getElementById('montajeTasa').value) || 0;
+  const desplazamiento = parseFloat(document.getElementById('montajeDesplazamiento').value) || 0;
+  const hotel = parseFloat(document.getElementById('montajeHotel').value) || 0;
+  const comida = parseFloat(document.getElementById('montajeComida').value) || 0;
+
+  if (personas <= 0 || dias <= 0) {
+    alert('❌ Completa al menos Personas y Días');
+    return;
+  }
+
+  // Cálculos
+  const manoObra = personas * dias * tasa;
+  const desplazamientoTotal = personas * desplazamiento;
+  const noches = Math.ceil(dias); // Asumimos 1 noche por día
+  const alojamiento = personas * noches * hotel;
+  const alimentacion = personas * dias * comida;
+  const total = manoObra + desplazamientoTotal + alojamiento + alimentacion;
+
+  // Mostrar desglose
+  let desglose = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;">
+      <div style="background:#f0f9ff;padding:12px;border-radius:6px;border-left:4px solid #3b82f6;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">Mano de Obra</div>
+        <div style="font-size:18px;font-weight:700;color:#3b82f6;">${fmt(manoObra)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${personas} × ${dias}d × ${fmt(tasa, true)}</div>
+      </div>
+      <div style="background:#fef3c7;padding:12px;border-radius:6px;border-left:4px solid #f59e0b;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">Desplazamiento</div>
+        <div style="font-size:18px;font-weight:700;color:#f59e0b;">${fmt(desplazamientoTotal)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${personas} × ${fmt(desplazamiento, true)}</div>
+      </div>
+      <div style="background:#dbeafe;padding:12px;border-radius:6px;border-left:4px solid #06b6d4;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">Alojamiento</div>
+        <div style="font-size:18px;font-weight:700;color:#06b6d4;">${fmt(alojamiento)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${personas} × ${noches}n × ${fmt(hotel, true)}</div>
+      </div>
+      <div style="background:#ddf2f1;padding:12px;border-radius:6px;border-left:4px solid #14b8a6;">
+        <div style="font-size:12px;color:#6b7280;margin-bottom:4px;">Alimentación</div>
+        <div style="font-size:18px;font-weight:700;color:#14b8a6;">${fmt(alimentacion)}</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:4px;">${personas} × ${dias}d × ${fmt(comida, true)}</div>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('montajeDesglose').innerHTML = desglose;
+
+  // Mostrar resultado
+  const resultHtml = `
+    <div style="background:#f0f9ff;padding:20px;border-radius:8px;border:2px solid #3b82f6;text-align:center;">
+      <div style="font-size:14px;color:#6b7280;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">Costo Total de Montaje</div>
+      <div style="font-size:32px;font-weight:800;color:#3b82f6;">${fmt(total)}</div>
+    </div>
+  `;
+
+  document.getElementById('montajeResultado').innerHTML = resultHtml;
+  document.getElementById('montajeResultado').dataset.total = total;
+}
+
+function saveMontajeValue() {
+  const resultEl = document.getElementById('montajeResultado');
+  const total = parseFloat(resultEl.dataset.total) || 0;
+
+  if (total <= 0) {
+    alert('❌ Calcula primero el costo');
+    return;
+  }
+
+  if (montajeCallback) {
+    montajeCallback(total);
+  }
+
+  closeMontajeCalculator();
+}
 </script>
+
+<!-- MODAL MONTAJE CALCULATOR -->
+<div id="montajeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;padding:20px;">
+  <div style="background:#ffffff;border-radius:12px;box-shadow:0 20px 25px -5px rgba(0,0,0,0.1);max-width:600px;width:100%;max-height:90vh;overflow-y:auto;">
+    <!-- Header -->
+    <div style="padding:24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+      <h2 style="font-size:18px;font-weight:700;color:#1f2937;margin:0;">Calculador de Montaje</h2>
+      <button onclick="closeMontajeCalculator()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#6b7280;">×</button>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:24px;">
+      <!-- Inputs -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px;">
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Nº de Personas</label>
+          <input id="montajePersonas" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Nº de Días</label>
+          <input id="montajeDias" type="number" placeholder="0" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Tasa €/día/persona</label>
+          <input id="montajeTasa" type="number" placeholder="0" step="0.01" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Desplazamiento €/persona</label>
+          <input id="montajeDesplazamiento" type="number" placeholder="0" step="0.01" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Hotel €/noche/persona</label>
+          <input id="montajeHotel" type="number" placeholder="0" step="0.01" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;font-weight:600;color:#4b5563;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Comida €/día/persona</label>
+          <input id="montajeComida" type="number" placeholder="0" step="0.01" style="width:100%;padding:10px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;" />
+        </div>
+      </div>
+
+      <!-- Desglose -->
+      <div id="montajeDesglose" style="margin-bottom:24px;"></div>
+
+      <!-- Resultado -->
+      <div id="montajeResultado" style="margin-bottom:24px;"></div>
+
+      <!-- Botones -->
+      <div style="display:flex;gap:12px;justify-content:flex-end;">
+        <button onclick="closeMontajeCalculator()" style="padding:10px 24px;background:#f3f4f6;color:#4b5563;border:1px solid #e5e7eb;border-radius:6px;font-weight:600;cursor:pointer;transition:all 0.2s;">Cancelar</button>
+        <button onclick="calculateMontaje()" style="padding:10px 24px;background:#3b82f6;color:#ffffff;border:none;border-radius:6px;font-weight:600;cursor:pointer;transition:all 0.2s;">Calcular</button>
+        <button onclick="saveMontajeValue()" style="padding:10px 24px;background:#10b981;color:#ffffff;border:none;border-radius:6px;font-weight:600;cursor:pointer;transition:all 0.2s;">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
