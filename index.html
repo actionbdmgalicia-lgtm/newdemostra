@@ -655,26 +655,55 @@ tr:hover { background:#f3f4f6; }
     <div id="dashboard-page" class="page-section active">
       <h2 style="font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:24px;color:#1f2937;">Dashboard</h2>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
-        <!-- ANÁLISIS POR AÑO (IZQUIERDA) -->
-        <div class="card">
-          <div class="card-header"><h3>Análisis por Año</h3></div>
-          <div class="card-body" style="overflow-x:auto;padding:0;">
-            <tbody id="dashIngresosPorAno"></tbody>
-          </div>
+      <!-- RESUMEN GLOBAL (4 CARDS) -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;">
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:12px;color:#6b7280;font-weight:500;margin-bottom:8px;">INGRESOS</div>
+          <div style="font-size:24px;font-weight:700;color:#10b981;" id="dashIngresos">€0</div>
         </div>
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:12px;color:#6b7280;font-weight:500;margin-bottom:8px;">GASTOS</div>
+          <div style="font-size:24px;font-weight:700;color:#ef4444;" id="dashGastos">€0</div>
+        </div>
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:12px;color:#6b7280;font-weight:500;margin-bottom:8px;">MARGEN</div>
+          <div style="font-size:24px;font-weight:700;color:#f59e0b;" id="dashMargen">€0</div>
+        </div>
+        <div class="card" style="text-align:center;padding:16px;">
+          <div style="font-size:12px;color:#6b7280;font-weight:500;margin-bottom:8px;">% MARGEN</div>
+          <div style="font-size:24px;font-weight:700;color:#3b82f6;" id="dashMargenPct">0%</div>
+        </div>
+      </div>
 
-        <!-- TOP GASTOS POR CATEGORÍA (DERECHA) -->
-        <div class="card">
-          <div class="card-header"><h3>Top Gastos por Categoría</h3></div>
-          <div class="card-body" style="overflow-x:auto;padding:0;">
+      <!-- DESGLOSE DE GASTOS POR CATEGORÍA (TABLA) -->
+      <div class="card">
+        <div class="card-header"><h3>Desglose de Gastos por Categoría</h3></div>
+        <div class="card-body" style="overflow-x:auto;padding:0;">
+          <table style="width:100%;border-collapse:collapse;">
+            <thead style="background:#f3f4f6;border-bottom:2px solid #d1d5db;">
+              <tr style="color:#1f2937;font-weight:700;">
+                <th style="text-align:left;padding:12px;">Categoría</th>
+                <th style="text-align:right;padding:12px;">Monto</th>
+                <th style="text-align:right;padding:12px;">%</th>
+              </tr>
+            </thead>
             <tbody id="dashGastosPorCategoria"></tbody>
-          </div>
+          </table>
+        </div>
+      </div>
+
+      <!-- GRÁFICO DE CATEGORÍAS -->
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><h3>Distribución de Gastos por Categoría</h3></div>
+        <div class="card-body" style="display:flex;gap:24px;align-items:flex-start;">
+          <svg id="dashChartSvg" viewBox="0 0 200 200" style="width:200px;height:200px;flex-shrink:0;"></svg>
+          <div id="dashChartLegend" style="flex:1;display:flex;flex-direction:column;gap:8px;font-size:12px;"></div>
         </div>
       </div>
 
       <!-- Elementos ocultos para compatibilidad -->
       <div style="display:none;">
+        <tbody id="dashIngresosPorAno"></tbody>
         <tbody id="dashGastosPorAno"></tbody>
         <tbody id="dashMargenPorAno"></tbody>
       </div>
@@ -1219,70 +1248,117 @@ function autoCategorizeExpense(cost) {
 function loadDashboard() {
   enrichCostsWithType2();
 
-  // Agrupar costos por año
-  const byYear = {};
-  allCosts.forEach(c => {
-    const feria = allFerias.find(f => f.id === c.feriaId);
-    if (!feria) return;
-    const year = feria.year;
-    if (!byYear[year]) byYear[year] = [];
-    byYear[year].push(c);
-  });
-
-  const years = Object.keys(byYear).map(Number).sort();
-
-  // ── SECCIÓN 1: ANÁLISIS POR AÑO ─────────────────
-  let htmlYears = '<table style="width:100%;border-collapse:collapse;"><thead style="background:#f3f4f6;border-bottom:2px solid #d1d5db;"><tr style="color:#1f2937;font-weight:700;"><th style="text-align:left;padding:12px;">Año</th><th style="text-align:right;padding:12px;color:#10b981;">Ingresos</th><th style="text-align:right;padding:12px;color:#ef4444;">Gastos</th><th style="text-align:right;padding:12px;color:#f59e0b;">Margen</th></tr></thead><tbody>';
-
-  years.forEach(year => {
-    let ing = 0, gas = 0;
-    byYear[year].forEach(c => {
-      const a = parseFloat(c.amount) || 0;
-      if (c.type === 'VENTAS' || a > 0) ing += Math.abs(a);
-      else gas += Math.abs(a);
-    });
-    const mar = ing - gas;
-    const marColor = mar >= 0 ? '#10b981' : '#ef4444';
-    htmlYears += `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px;font-weight:600;color:#1f2937;">${year}</td><td style="padding:12px;text-align:right;color:#10b981;font-weight:600;">${fmt(ing)}</td><td style="padding:12px;text-align:right;color:#ef4444;font-weight:600;">${fmt(gas)}</td><td style="padding:12px;text-align:right;color:${marColor};font-weight:600;">${fmt(mar)}</td></tr>`;
-  });
-  htmlYears += '</tbody></table>';
-
-  document.getElementById('dashIngresosPorAno').parentElement.parentElement.innerHTML = `<div style="overflow-x:auto;">${htmlYears}</div>`;
-
-  // ── SECCIÓN 2: TOP GASTOS POR CATEGORÍA ────────
+  // CALCULAR TOTALES GLOBALES (todos los años, todas las ferias)
+  let totalIngresos = 0, totalGastos = 0;
   const byCategory = {};
+
   allCosts.forEach(c => {
     const a = parseFloat(c.amount) || 0;
-    if (c.type !== 'VENTAS' && a <= 0) {
+    if (c.type === 'VENTAS' || a > 0) {
+      totalIngresos += Math.abs(a);
+    } else {
+      totalGastos += Math.abs(a);
       const cat = c.type2 || 'OTROS';
       if (!byCategory[cat]) byCategory[cat] = 0;
       byCategory[cat] += Math.abs(a);
     }
   });
 
-  const totalGastos = Object.values(byCategory).reduce((a, b) => a + b, 0);
+  const totalMargen = totalIngresos - totalGastos;
+  const margenPct = totalIngresos > 0 ? ((totalMargen / totalIngresos) * 100).toFixed(1) : 0;
+  const margenColor = margenPct >= 50 ? '#10b981' : '#ef4444';
+
+  // ── ACTUALIZAR CARDS DE RESUMEN ──────────────────
+  document.getElementById('dashIngresos').textContent = fmt(totalIngresos);
+  document.getElementById('dashGastos').textContent = fmt(totalGastos);
+  document.getElementById('dashMargen').textContent = fmt(totalMargen);
+  document.getElementById('dashMargenPct').textContent = fmt(margenPct, 'percent');
+  document.getElementById('dashMargenPct').style.color = margenColor;
+
+  // ── TABLA DESGLOSE DE GASTOS ─────────────────────
+  const totalGastosSum = Object.values(byCategory).reduce((a, b) => a + b, 0);
   const catEntries = Object.entries(byCategory)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8);
+    .sort((a, b) => b[1] - a[1]);
 
-  let htmlCats = '<table style="width:100%;border-collapse:collapse;"><thead style="background:#f3f4f6;border-bottom:2px solid #d1d5db;"><tr style="color:#1f2937;font-weight:700;"><th style="text-align:left;padding:12px;">Categoría</th><th style="text-align:right;padding:12px;">Monto</th><th style="text-align:right;padding:12px;">%</th></tr></thead><tbody>';
-
+  let htmlCats = '';
   catEntries.forEach(([cat, amount]) => {
-    const pct = totalGastos > 0 ? ((amount / totalGastos) * 100).toFixed(1) : 0;
-    htmlCats += `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px;color:#1f2937;font-weight:500;">${cat}</td><td style="padding:12px;text-align:right;color:#ef4444;font-weight:600;">${fmt(amount)}</td><td style="padding:12px;text-align:right;color:#6b7280;">${fmt(pct, 'percent')}</td></tr>`;
+    const pct = totalGastosSum > 0 ? ((amount / totalGastosSum) * 100).toFixed(1) : 0;
+    const catColor = cat === 'OTROS' ? '#9ca3af' : '#ef4444';
+    htmlCats += `<tr style="border-bottom:1px solid #e5e7eb;">
+      <td style="padding:12px;color:#1f2937;font-weight:500;">${cat}</td>
+      <td style="padding:12px;text-align:right;color:${catColor};font-weight:600;">${fmt(amount)}</td>
+      <td style="padding:12px;text-align:right;color:#6b7280;">${pct}%</td>
+    </tr>`;
   });
 
   if (catEntries.length === 0) {
     htmlCats += '<tr><td colspan="3" style="padding:12px;text-align:center;color:#9ca3af;">Sin datos</td></tr>';
   }
 
-  htmlCats += '</tbody></table>';
+  document.getElementById('dashGastosPorCategoria').innerHTML = htmlCats;
 
-  document.getElementById('dashGastosPorCategoria').parentElement.parentElement.innerHTML = `<div style="overflow-x:auto;">${htmlCats}</div>`;
+  // ── GRÁFICO DONUT DE CATEGORÍAS ──────────────────
+  drawDashboardChart(byCategory);
 
-  // Limpiar tablas antiguas (ahora no necesarias)
+  // Limpiar tablas antiguas
+  document.getElementById('dashIngresosPorAno').innerHTML = '';
   document.getElementById('dashGastosPorAno').innerHTML = '';
   document.getElementById('dashMargenPorAno').innerHTML = '';
+}
+
+function drawDashboardChart(byCategory) {
+  const colors = ['#10b981', '#ef4444', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4', '#a855f7'];
+  const totalGastos = Object.values(byCategory).reduce((a, b) => a + b, 0);
+
+  if (totalGastos === 0) {
+    document.getElementById('dashChartSvg').innerHTML = '';
+    document.getElementById('dashChartLegend').innerHTML = '<div style="color:#9ca3af;">Sin datos</div>';
+    return;
+  }
+
+  const svg = document.getElementById('dashChartSvg');
+  svg.innerHTML = '';
+
+  const cx = 100, cy = 100, r = 70, innerR = 45;
+  let currentAngle = -Math.PI / 2;
+
+  const entries = Object.entries(byCategory).sort((a, b) => b[1] - a[1]);
+
+  entries.forEach(([cat, value], idx) => {
+    const angle = (value / totalGastos) * 2 * Math.PI;
+    const x1 = cx + r * Math.cos(currentAngle);
+    const y1 = cy + r * Math.sin(currentAngle);
+    const endAngle = currentAngle + angle;
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+
+    const largeArc = angle > Math.PI ? 1 : 0;
+
+    const ix1 = cx + innerR * Math.cos(currentAngle);
+    const iy1 = cy + innerR * Math.sin(currentAngle);
+    const ix2 = cx + innerR * Math.cos(endAngle);
+    const iy2 = cy + innerR * Math.sin(endAngle);
+
+    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    path.setAttribute('d', `M ${ix1} ${iy1} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} L ${ix2} ${iy2} A ${innerR} ${innerR} 0 ${largeArc} 0 ${ix1} ${iy1}`);
+    path.setAttribute('fill', colors[idx % colors.length]);
+    path.setAttribute('stroke', '#fff');
+    path.setAttribute('stroke-width', '2');
+    svg.appendChild(path);
+
+    currentAngle = endAngle;
+  });
+
+  // LEYENDA
+  let legendHtml = '';
+  entries.forEach(([cat, value], idx) => {
+    const pct = ((value / totalGastos) * 100).toFixed(1);
+    legendHtml += `<div style="display:flex;align-items:center;gap:8px;">
+      <div style="width:12px;height:12px;border-radius:2px;background-color:${colors[idx % colors.length]};"></div>
+      <span style="color:#1f2937;">${cat} <span style="color:#6b7280;">${pct}%</span></span>
+    </div>`;
+  });
+  document.getElementById('dashChartLegend').innerHTML = legendHtml;
 }
 
 // ── VISUALIZACIÓN ─────────────────────────────────────────
