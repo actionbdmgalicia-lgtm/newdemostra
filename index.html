@@ -654,11 +654,57 @@ tr:hover { background:#f3f4f6; }
     <!-- DASHBOARD PAGE -->
     <div id="dashboard-page" class="page-section active">
       <h2 style="font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:24px;color:#1f2937;">Dashboard</h2>
-      <div class="stats" id="dashboardStats">
-        <div class="stat"><div class="label">Ingresos Totales</div><div class="value green" id="dashIng">—</div></div>
-        <div class="stat"><div class="label">Gastos Totales</div><div class="value red" id="dashGas">—</div></div>
-        <div class="stat"><div class="label">Margen Neto</div><div class="value accent" id="dashMar">—</div></div>
-        <div class="stat"><div class="label">% Margen</div><div class="value accent" id="dashPct">—</div></div>
+
+      <!-- INGRESOS POR AÑO -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header"><h3>Ingresos por Año</h3></div>
+        <div class="card-body" style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Año</th><th style="text-align:right;">Total Ingresos</th></tr>
+            </thead>
+            <tbody id="dashIngresosPorAno"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- GASTOS POR AÑO -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header"><h3>Gastos por Año</h3></div>
+        <div class="card-body" style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Año</th><th style="text-align:right;">Total Gastos</th></tr>
+            </thead>
+            <tbody id="dashGastosPorAno"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- MARGEN POR AÑO -->
+      <div class="card" style="margin-bottom:24px;">
+        <div class="card-header"><h3>Margen por Año</h3></div>
+        <div class="card-body" style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Año</th><th style="text-align:right;">Margen</th></tr>
+            </thead>
+            <tbody id="dashMargenPorAno"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DESGLOSE DE GASTOS POR CATEGORÍA -->
+      <div class="card">
+        <div class="card-header"><h3>Desglose de Gastos por Categoría</h3></div>
+        <div class="card-body" style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>Categoría</th><th style="text-align:right;">Total Gasto</th></tr>
+            </thead>
+            <tbody id="dashGastosPorCategoria"></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -1117,19 +1163,75 @@ function enrichCostsWithType2() {
 }
 
 function loadDashboard() {
-  let ing=0, gas=0;
+  enrichCostsWithType2();
+
+  // Agrupar costos por año
+  const byYear = {};
   allCosts.forEach(c => {
-    const a=parseFloat(c.amount)||0;
-    if(c.type==='VENTAS'||a>0) ing+=Math.abs(a);
-    else gas+=Math.abs(a);
+    const feria = allFerias.find(f => f.id === c.feriaId);
+    if (!feria) return;
+    const year = feria.year;
+    if (!byYear[year]) byYear[year] = [];
+    byYear[year].push(c);
   });
-  const mar=ing-gas, pct=ing>0?((mar/ing)*100).toFixed(1):0;
-  document.getElementById('dashIng').textContent = fmt(ing);
-  document.getElementById('dashGas').textContent = fmt(gas);
-  document.getElementById('dashMar').textContent = fmt(mar);
-  document.getElementById('dashMar').classList.toggle('red', mar < 0);
-  document.getElementById('dashMar').classList.toggle('green', mar >= 0);
-  document.getElementById('dashPct').textContent = fmt(pct, 'percent');
+
+  const years = Object.keys(byYear).map(Number).sort();
+
+  // TABLA: INGRESOS POR AÑO
+  let htmlIng = '';
+  years.forEach(year => {
+    let ing = 0;
+    byYear[year].forEach(c => {
+      const a = parseFloat(c.amount) || 0;
+      if (c.type === 'VENTAS' || a > 0) ing += Math.abs(a);
+    });
+    htmlIng += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;">${fmt(ing)}</td></tr>`;
+  });
+  document.getElementById('dashIngresosPorAno').innerHTML = htmlIng || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+
+  // TABLA: GASTOS POR AÑO
+  let htmlGas = '';
+  years.forEach(year => {
+    let gas = 0;
+    byYear[year].forEach(c => {
+      const a = parseFloat(c.amount) || 0;
+      if (c.type !== 'VENTAS' && a <= 0) gas += Math.abs(a);
+    });
+    htmlGas += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;">${fmt(gas)}</td></tr>`;
+  });
+  document.getElementById('dashGastosPorAno').innerHTML = htmlGas || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+
+  // TABLA: MARGEN POR AÑO
+  let htmlMar = '';
+  years.forEach(year => {
+    let ing = 0, gas = 0;
+    byYear[year].forEach(c => {
+      const a = parseFloat(c.amount) || 0;
+      if (c.type === 'VENTAS' || a > 0) ing += Math.abs(a);
+      else gas += Math.abs(a);
+    });
+    const mar = ing - gas;
+    htmlMar += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;color:${mar >= 0 ? '#15803d' : '#dc2626'};">${fmt(mar)}</td></tr>`;
+  });
+  document.getElementById('dashMargenPorAno').innerHTML = htmlMar || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+
+  // TABLA: GASTOS POR CATEGORÍA
+  const byCategory = {};
+  allCosts.forEach(c => {
+    const a = parseFloat(c.amount) || 0;
+    if (c.type !== 'VENTAS' && a <= 0) {
+      const cat = c.type2 || 'OTROS';
+      if (!byCategory[cat]) byCategory[cat] = 0;
+      byCategory[cat] += Math.abs(a);
+    }
+  });
+
+  const cats = Object.entries(byCategory)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, total]) => `<tr><td>${cat}</td><td style="text-align:right;font-weight:600;">${fmt(total)}</td></tr>`)
+    .join('');
+
+  document.getElementById('dashGastosPorCategoria').innerHTML = cats || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
 }
 
 // ── VISUALIZACIÓN ─────────────────────────────────────────
