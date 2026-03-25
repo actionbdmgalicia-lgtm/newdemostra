@@ -1639,25 +1639,26 @@ let cSelYear = null, cSelFeria = null, cSelCliente = null;
 let cSelClientesMultiples = new Set();
 async function initCarga() {
   const years = [...new Set(allFerias.map(f=>f.year).filter(Boolean))].sort();
-  renderChips('cChipsYear', [null,...years], y=>y?String(y):'TODOS', y=>y===cSelYear, y=>{
+  renderChips('cChipsYear', [null,...years], y=>y?String(y):'TODOS', y=>y===cSelYear, async y=>{
     cSelYear = y;
     document.getElementById('cRowFeria').style.display = y !== null ? 'flex' : 'none';
     document.getElementById('cRowCliente').style.display = 'none';
     cSelFeria = null;
     cSelCliente = null;
     cSelClientesMultiples.clear();
-    buildCargaFilters();
+    await buildCargaFilters();
   });
-  buildCargaFilters();
+  await buildCargaFilters();
   renderCargaContent();
 }
 
-function buildCargaFilters() {
+async function buildCargaFilters() {
   // Ferias
   if (cSelYear !== null) {
     const ferias = [...new Set(allFerias.filter(f => f.year === cSelYear).map(f => f.name).filter(Boolean))].sort();
     renderChips('cChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===cSelFeria, f=>{
       cSelFeria = f;
+      cSelCliente = null;
       document.getElementById('cRowCliente').style.display = f !== null ? 'flex' : 'none';
       buildCargaFilters();
     });
@@ -1667,12 +1668,15 @@ function buildCargaFilters() {
     return;
   }
 
-  // Clientes - Single select dropdown (ONLY from current feria)
+  // Clientes - Chips con 3 secciones
   if (cSelFeria !== null) {
     const feria = allFerias.find(f => f.year === cSelYear && f.name === cSelFeria);
     const feriaId = feria ? feria.id : null;
 
-    // Get ONLY clients assigned to this feria
+    // Hacer migración automática de clientes sin asignar
+    await migrateUnassignedClients(feriaId);
+
+    // Get clients assigned to this feria
     const feriaClients = [];
     allClients.forEach(c => {
       const assignments = clientFeriaAssignments.get(c.id) || new Set();
@@ -1680,67 +1684,208 @@ function buildCargaFilters() {
         feriaClients.push({ id: c.id, name: c.name });
       }
     });
-
     feriaClients.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Get clients NOT assigned to this feria (para usar de otra)
+    const otherClients = [];
+    allClients.forEach(c => {
+      const assignments = clientFeriaAssignments.get(c.id) || new Set();
+      if (!assignments.has(feriaId)) {
+        otherClients.push({ id: c.id, name: c.name });
+      }
+    });
+    otherClients.sort((a, b) => a.name.localeCompare(b.name));
 
     const container = document.getElementById('cChipsCliente');
     container.innerHTML = '';
 
-    // Dropdown container
-    const dropdownContainer = document.createElement('div');
-    dropdownContainer.style.cssText = 'display:flex;gap:12px;align-items:center;width:100%;';
+    // Sección 1: CLIENTES DE ESTA FERIA
+    const sec1 = document.createElement('div');
+    sec1.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:16px;background:#f3f4f6;border-radius:4px;border:1px solid #e5e7eb;';
 
-    // Dropdown select
+    const sec1Title = document.createElement('div');
+    sec1Title.style.cssText = 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;';
+    sec1Title.textContent = '↓ Clientes de Esta Feria';
+    sec1.appendChild(sec1Title);
+
+    const sec1Chips = document.createElement('div');
+    sec1Chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
+
+    if (feriaClients.length === 0) {
+      const noClients = document.createElement('div');
+      noClients.style.cssText = 'font-size:12px;color:#9ca3af;font-style:italic;';
+      noClients.textContent = 'No hay clientes asignados';
+      sec1Chips.appendChild(noClients);
+    } else {
+      feriaClients.forEach(client => {
+        const chip = document.createElement('button');
+        chip.className = 'chip';
+        chip.textContent = client.name;
+        chip.style.cssText = cSelCliente === client.id
+          ? 'background:#e3a017;color:white;border:1px solid #e3a017;'
+          : 'background:#ffffff;color:#1f2937;border:1px solid #e5e7eb;';
+        chip.onclick = () => {
+          cSelCliente = client.id;
+          buildCargaFilters();
+        };
+        sec1Chips.appendChild(chip);
+      });
+    }
+    sec1.appendChild(sec1Chips);
+    container.appendChild(sec1);
+
+    // Sección 2: USAR CLIENTE DE OTRA FERIA
+    const sec2 = document.createElement('div');
+    sec2.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:16px;background:#f3f4f6;border-radius:4px;border:1px solid #e5e7eb;';
+
+    const sec2Title = document.createElement('div');
+    sec2Title.style.cssText = 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;';
+    sec2Title.innerHTML = '↓ + Usar Cliente de Otra Feria';
+    sec2.appendChild(sec2Title);
+
+    const sec2Controls = document.createElement('div');
+    sec2Controls.style.cssText = 'display:flex;gap:8px;align-items:center;';
+
     const select = document.createElement('select');
     select.style.cssText = `
       flex:1;
       padding:10px 12px;
-      background:#e5e7eb;
+      background:#ffffff;
       color:#1f2937;
-      border:1px solid #333333;
+      border:1px solid #d1d5db;
       border-radius:4px;
       font-size:14px;
       cursor:pointer;
       font-family:'Inter',sans-serif;
     `;
 
-    // Option: Seleccionar Cliente
     const optionDefault = document.createElement('option');
     optionDefault.value = '';
-    optionDefault.textContent = '→ Seleccionar Cliente';
-    optionDefault.selected = cSelCliente === null;
+    optionDefault.textContent = '→ Seleccionar cliente...';
     select.appendChild(optionDefault);
 
-    // Options: Feria clients
-    feriaClients.forEach(client => {
+    otherClients.forEach(client => {
       const option = document.createElement('option');
       option.value = client.id;
       option.textContent = client.name;
-      option.selected = cSelCliente === client.id;
       select.appendChild(option);
     });
 
-    select.onchange = (e) => {
-      cSelCliente = e.target.value || null;
-      renderCargaContent();
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary';
+    addBtn.textContent = 'Agregar';
+    addBtn.style.cssText = 'white-space:nowrap;padding:10px 16px;';
+    addBtn.onclick = async () => {
+      const clientId = select.value;
+      if (clientId) {
+        await assignClientToFeria(clientId, feriaId);
+        select.value = '';
+        await buildCargaFilters();
+      }
     };
 
-    dropdownContainer.appendChild(select);
+    sec2Controls.appendChild(select);
+    sec2Controls.appendChild(addBtn);
+    sec2.appendChild(sec2Controls);
+    container.appendChild(sec2);
 
-    // Button: Create new
-    const newBtn = document.createElement('button');
-    newBtn.className = 'chip';
-    newBtn.textContent = '+ NUEVO';
-    newBtn.style.cssText = 'border:1px dashed #e3a017;color:#e3a017;background:transparent;cursor:pointer;white-space:nowrap;';
-    newBtn.onclick = () => document.getElementById('modalCreateCliente').classList.add('active');
-    dropdownContainer.appendChild(newBtn);
+    // Sección 3: CREAR CLIENTE NUEVO
+    const sec3 = document.createElement('div');
+    sec3.style.cssText = 'display:flex;flex-direction:column;gap:12px;padding:16px;background:#f3f4f6;border-radius:4px;border:1px solid #e5e7eb;';
 
-    container.appendChild(dropdownContainer);
+    const sec3Title = document.createElement('div');
+    sec3Title.style.cssText = 'font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;';
+    sec3Title.innerHTML = '↓ + Crear Cliente Nuevo';
+    sec3.appendChild(sec3Title);
+
+    const sec3Controls = document.createElement('div');
+    sec3Controls.style.cssText = 'display:flex;gap:8px;align-items:center;';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.id = 'newClienteNameInput';
+    input.placeholder = 'Nombre del nuevo cliente';
+    input.style.cssText = `
+      flex:1;
+      padding:10px 12px;
+      background:#ffffff;
+      color:#1f2937;
+      border:1px solid #d1d5db;
+      border-radius:4px;
+      font-size:14px;
+      font-family:'Inter',sans-serif;
+    `;
+
+    const createBtn = document.createElement('button');
+    createBtn.className = 'btn btn-primary';
+    createBtn.textContent = 'Crear';
+    createBtn.style.cssText = 'white-space:nowrap;padding:10px 16px;';
+    createBtn.onclick = async () => {
+      const name = input.value.trim();
+      if (!name) {
+        alert('Ingresa el nombre del cliente');
+        return;
+      }
+      try {
+        const newClientRef = await db.collection('clients').add({
+          name: name,
+          createdAt: new Date(),
+          createdBy: currentUser?.email || 'unknown'
+        });
+
+        // Agregar a memoria
+        allClients.push({ id: newClientRef.id, name: name });
+
+        // Asignar automáticamente a esta feria
+        await assignClientToFeria(newClientRef.id, feriaId);
+        clientFeriaAssignments.set(newClientRef.id, new Set([feriaId]));
+
+        // Seleccionar automáticamente
+        cSelCliente = newClientRef.id;
+
+        input.value = '';
+        await buildCargaFilters();
+        alert('✓ Cliente creado y asignado');
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    };
+
+    sec3Controls.appendChild(input);
+    sec3Controls.appendChild(createBtn);
+    sec3.appendChild(sec3Controls);
+    container.appendChild(sec3);
+
     renderCargaContent();
   } else {
     document.getElementById('cChipsCliente').innerHTML = '';
     cSelCliente = null;
     renderCargaContent();
+  }
+}
+
+async function migrateUnassignedClients(feriaId) {
+  // Si hay costos de clientes no asignados, asignarlos automáticamente
+  try {
+    const clientsInFeriaCosts = new Set();
+    allCosts.forEach(cost => {
+      if (cost.feriaId === feriaId && cost.clientId) {
+        clientsInFeriaCosts.add(cost.clientId);
+      }
+    });
+
+    for (const clientId of clientsInFeriaCosts) {
+      const assignments = clientFeriaAssignments.get(clientId) || new Set();
+      if (!assignments.has(feriaId)) {
+        assignments.add(feriaId);
+        clientFeriaAssignments.set(clientId, assignments);
+
+        // Guardar en Firestore
+        await assignClientToFeria(clientId, feriaId);
+      }
+    }
+  } catch (error) {
+    console.error('Error en migración:', error);
   }
 }
 
@@ -1793,7 +1938,7 @@ function renderCargaContent() {
   // Si no hay cliente seleccionado, mostrar mensaje
   if (cSelCliente === null) {
     if (cSelYear !== null && cSelFeria !== null) {
-      content.innerHTML = '<p style="padding:20px;color:#4b5563;text-align:center;">Selecciona un cliente para cargar datos</p>';
+      content.innerHTML = '<p style="padding:20px;color:#9ca3af;text-align:center;font-style:italic;">Selecciona un cliente para cargar datos</p>';
     } else {
       content.innerHTML = '';
     }
@@ -1802,6 +1947,7 @@ function renderCargaContent() {
 
   const feria = allFerias.find(f => f.year === cSelYear && f.name === cSelFeria);
   const feriaId = feria ? feria.id : null;
+  const selectedClient = allClients.find(c => c.id === cSelCliente);
 
   // Cargar costos para el cliente seleccionado + feria
   const cargaCosts = allCosts.filter(c =>
@@ -1809,6 +1955,12 @@ function renderCargaContent() {
   );
 
   let html = '';
+
+  // Encabezado con nombre del cliente
+  html += `<div style="margin-bottom:24px;padding:16px;background:#f0f9ff;border-left:4px solid #e3a017;">`;
+  html += `<div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.5px;font-weight:700;margin-bottom:4px;">Cliente Seleccionado</div>`;
+  html += `<div style="font-size:18px;color:#1f2937;font-weight:700;">${selectedClient?.name || 'Cliente'}</div>`;
+  html += `</div>`;
 
   // Formulario de carga
   html += renderCargaForm();
@@ -1968,20 +2120,20 @@ async function saveCargaCost() {
       createdBy: currentUser?.email || 'unknown'
     });
 
-    // Limpiar formulario
-    document.getElementById('cargaTipo1').value = 'VENTAS';
-    document.getElementById('cargaTipo2').value = 'CARPINTERIA';
-    document.getElementById('cargaDescripcion').value = '';
-    document.getElementById('cargaProveedor').value = '';
-    document.getElementById('cargaImporte').value = '';
-    document.getElementById('cargaEstado').value = 'PENDIENTE';
-    document.getElementById('cargaFecha').value = new Date().toISOString().split('T')[0];
-
     // Recargar datos
     const cSnap = await db.collection('costs').get();
     allCosts = [];
     cSnap.forEach(d => allCosts.push({id:d.id,...d.data()}));
     enrichCostsWithType2();
+
+    // Limpiar formulario
+    if (document.getElementById('cargaTipo1')) document.getElementById('cargaTipo1').value = 'GASTO';
+    if (document.getElementById('cargaTipo2')) document.getElementById('cargaTipo2').value = 'OTROS';
+    if (document.getElementById('cargaDescripcion')) document.getElementById('cargaDescripcion').value = '';
+    if (document.getElementById('cargaProveedor')) document.getElementById('cargaProveedor').value = '';
+    if (document.getElementById('cargaImporte')) document.getElementById('cargaImporte').value = '';
+    if (document.getElementById('cargaEstado')) document.getElementById('cargaEstado').value = 'PENDIENTE';
+    if (document.getElementById('cargaFecha')) document.getElementById('cargaFecha').value = new Date().toISOString().split('T')[0];
 
     renderCargaContent();
     alert('✓ Movimiento guardado correctamente');
