@@ -777,8 +777,8 @@ tr:hover { background:#f3f4f6; }
 
       <!-- SUB-TABS -->
       <div class="sub-tabs">
-        <button class="sub-tab-btn active" onclick="switchPptoSub('crear')">Crear / Editar</button>
-        <button class="sub-tab-btn" onclick="switchPptoSub('ver')">Visualizar</button>
+        <button class="sub-tab-btn active" onclick="switchPptoSub('iniciales')">Presupuestos Iniciales</button>
+        <button class="sub-tab-btn" onclick="switchPptoSub('crm')">Seguimiento</button>
         <button class="sub-tab-btn" onclick="switchPptoSub('avance')">Avance vs Real</button>
       </div>
 
@@ -798,57 +798,51 @@ tr:hover { background:#f3f4f6; }
         </div>
       </div>
 
-      <!-- SUB 1: CREAR -->
-      <div id="ppto-sub-crear" class="sub-tab-content active">
-        <div class="card carga-full">
-          <div class="card-header"><h2>Nueva Partida de Presupuesto</h2></div>
+      <!-- SUB 1: PRESUPUESTOS INICIALES (Tabla Matriz) -->
+      <div id="ppto-sub-iniciales" class="sub-tab-content active">
+        <div class="card" style="margin-bottom:24px;">
+          <div class="card-header"><h2>Matriz de Presupuestos</h2></div>
           <div class="card-body">
-            <div class="form-group">
-              <div class="form-field"><label>Tipo</label>
-                <select id="pptoNewTipo1">
-                  <option value="1. INGRESO">INGRESO</option>
-                  <option value="2. GASTO">GASTO</option>
+            <div class="form-group" style="margin-bottom:16px;">
+              <div class="form-field"><label>Feria</label>
+                <select id="pptoMatrixFeria" onchange="buildPptoMatrixTable()">
+                  <option value="">Selecciona...</option>
                 </select>
               </div>
-              <div class="form-field"><label>Categoría</label>
-                <select id="pptoNewTipo2">
-                  <option>CARPINTERIA</option><option>MONTAJE</option>
-                  <option>MATERIAL</option><option>TRANSPORTE</option><option>GASTOS VIAJE</option>
-                  <option>GRAFICA</option><option>MOB ALQ</option><option>MOB COMPRA</option>
-                  <option>ELECTRICIDAD</option><option>SERVICIOS FERIALES</option><option>OTROS</option>
+              <div class="form-field"><label>Cliente</label>
+                <select id="pptoMatrixCliente" onchange="buildPptoMatrixTable()">
+                  <option value="">Selecciona...</option>
                 </select>
-              </div>
-              <div class="form-field" style="flex:2"><label>Detalle</label>
-                <input id="pptoNewDetalle" type="text" placeholder="Descripción">
-              </div>
-              <div class="form-field"><label>Importe (€)</label>
-                <input id="pptoNewImporte" type="number" step="0.01" placeholder="0.00">
               </div>
             </div>
-            <button class="btn btn-primary" onclick="savePptoPartida()">Guardar Partida</button>
+            <div style="overflow-x:auto;">
+              <div id="pptoMatrixContainer" style="border:1px solid #e5e7eb;border-radius:6px;"></div>
+            </div>
+            <div style="margin-top:16px;display:flex;gap:8px;">
+              <button class="btn btn-primary" onclick="savePptoMatrix()">Guardar Presupuesto</button>
+              <button class="btn btn-secondary" onclick="togglePptoMatrixZeros()">Ocultar items 0</button>
+            </div>
           </div>
         </div>
-        <div id="pptoEditBlock" style="margin-top:24px;"></div>
       </div>
 
-      <!-- SUB 2: VER -->
-      <div id="ppto-sub-ver" class="sub-tab-content" style="display:none;">
-        <div class="stats">
-          <div class="stat"><div class="label">Ingresos</div><div class="value green" id="vIngreso">—</div></div>
-          <div class="stat"><div class="label">Gastos</div><div class="value red" id="vGasto">—</div></div>
-          <div class="stat"><div class="label">Margen</div><div class="value accent" id="vMargen">—</div></div>
-          <div class="stat"><div class="label">% Margen</div><div class="value accent" id="vMargenPct">—</div></div>
+      <!-- SUB 2: SEGUIMIENTO (CRM) -->
+      <div id="ppto-sub-crm" class="sub-tab-content" style="display:none;">
+        <div class="card">
+          <div class="card-header"><h2>Seguimiento de Presupuestos</h2></div>
+          <div class="card-body">
+            <div id="pptoCrmContainer" style="display:grid;gap:24px;"></div>
+          </div>
         </div>
-        <div id="pptoVerBlock"></div>
       </div>
 
-      <!-- SUB 3: AVANCE -->
+      <!-- SUB 3: AVANCE vs REAL -->
       <div id="ppto-sub-avance" class="sub-tab-content" style="display:none;">
         <div class="stats">
           <div class="stat"><div class="label">Ingresos Ppto</div><div class="value" id="pptoIngPpto">—</div></div>
           <div class="stat"><div class="label">Ingresos Real</div><div class="value green" id="pptoIngReal">—</div></div>
-          <div class="stat"><div class="label">Desviación</div><div class="value" id="pptoIngDev">—</div></div>
-          <div class="stat"><div class="label">% Desviación</div><div class="value" id="pptoIngDevPct">—</div></div>
+          <div class="stat"><div class="label">Gastos Ppto</div><div class="value" id="pptoGastPpto">—</div></div>
+          <div class="stat"><div class="label">Gastos Real</div><div class="value red" id="pptoGastReal">—</div></div>
         </div>
         <div id="pptoDetalle"></div>
       </div>
@@ -1049,6 +1043,7 @@ let isAdmin = false;
 let allBudgets = [], pptoLoaded = false;
 let pptoSelYears = new Set(), pptoSelFerias = new Set(), pptoSelClientes = new Set();
 let pptoSubActual = 'crear';
+let pptoMatrixData = {}; // Para edición en tabla matriz
 
 function switchPage(page) {
   document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -1063,7 +1058,7 @@ function switchPage(page) {
 
 function switchPptoSub(sub) {
   pptoSubActual = sub;
-  ['crear','ver','avance'].forEach(s => {
+  ['iniciales','crm','avance'].forEach(s => {
     const el = document.getElementById('ppto-sub-' + s);
     if(el) {
       if (s === sub) el.style.display = 'block';
@@ -2427,123 +2422,279 @@ function applyPptoFilters() {
   if (pptoSelFerias.size > 0) filtered = filtered.filter(b => pptoSelFerias.has(b.feria));
   if (pptoSelClientes.size > 0) filtered = filtered.filter(b => pptoSelClientes.has(b.cliente));
 
-  if (pptoSubActual === 'crear') renderPptoCrear(filtered);
-  else if (pptoSubActual === 'ver') renderPptoVer(filtered);
+  if (pptoSubActual === 'iniciales') renderPptoIniciales(filtered);
+  else if (pptoSubActual === 'crm') renderPptoCrm(filtered);
   else if (pptoSubActual === 'avance') renderPptoAvance(filtered);
 }
 
-function renderPptoCrear(pptosFiltered) {
-  const block = document.getElementById('pptoEditBlock');
-  if (!pptosFiltered || pptosFiltered.length === 0) {
-    block.innerHTML = '<p style="padding:20px;color:#6b7280;">No hay presupuestos. Crea uno con el formulario arriba.</p>';
-    return;
-  }
-  let html = '';
-  pptosFiltered.forEach(p => {
-    html += `<div class="card" style="margin-bottom:16px;">
-      <div class="card-header">
-        <h2>${p.feria} - ${p.cliente} (${p.year})</h2>
-      </div>
-      <div class="card-body">
-        <p style="margin-bottom:12px;color:#4b5563;font-size:13px;"><strong>${p.descripcion}</strong></p>
-        <p style="margin-bottom:12px;color:#6b7280;"><span class="badge">${p.tipo}</span> <span class="badge">${p.categoria}</span></p>
-        <p style="font-size:16px;font-weight:700;color:#e3a017;">${fmt(p.importe)}</p>
-      </div>
-    </div>`;
-  });
-  block.innerHTML = html;
+// ── PRESUPUESTOS INICIALES (Tabla Matriz) ──
+function renderPptoIniciales(filtered) {
+  buildPptoMatrixSelects();
+  buildPptoMatrixTable();
 }
 
-function renderPptoVer(pptosFiltered) {
-  const block = document.getElementById('pptoVerBlock');
-  const vIngreso = document.getElementById('vIngreso');
-  const vGasto = document.getElementById('vGasto');
-  const vMargen = document.getElementById('vMargen');
-  const vMargenPct = document.getElementById('vMargenPct');
+function buildPptoMatrixSelects() {
+  const ferias = [...new Set(allBudgets.map(b => b.feria).filter(Boolean))].sort();
+  const feriaSelect = document.getElementById('pptoMatrixFeria');
+  feriaSelect.innerHTML = '<option value="">Selecciona...</option>' + ferias.map(f => `<option value="${f}">${f}</option>`).join('');
 
-  let ingreso = 0, gasto = 0;
-  if (pptosFiltered && pptosFiltered.length > 0) {
-    pptosFiltered.forEach(p => {
-      const amt = parseFloat(p.importe) || 0;
-      if (p.tipo === '1. INGRESO') ingreso += Math.abs(amt);
-      else gasto += Math.abs(amt);
-    });
-  }
+  const clientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
+  const clienteSelect = document.getElementById('pptoMatrixCliente');
+  clienteSelect.innerHTML = '<option value="">Selecciona...</option>' + clientes.map(c => `<option value="${c}">${c}</option>`).join('');
+}
 
-  const margen = ingreso - gasto;
-  const margenPct = ingreso > 0 ? ((margen / ingreso) * 100).toFixed(1) : 0;
+function buildPptoMatrixTable() {
+  const feria = document.getElementById('pptoMatrixFeria')?.value || '';
+  const cliente = document.getElementById('pptoMatrixCliente')?.value || '';
+  const container = document.getElementById('pptoMatrixContainer');
 
-  vIngreso.textContent = fmt(ingreso);
-  vGasto.textContent = fmt(gasto);
-  vMargen.textContent = fmt(margen);
-  vMargen.classList.toggle('red', margen < 0);
-  vMargen.classList.toggle('green', margen >= 0);
-  vMargenPct.textContent = fmt(margenPct, 'percent');
-
-  if (!pptosFiltered || pptosFiltered.length === 0) {
-    block.innerHTML = '<p style="padding:20px;color:#6b7280;">No hay presupuestos</p>';
+  if (!feria || !cliente) {
+    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">Selecciona una Feria y Cliente</p>';
     return;
   }
 
-  // Agrupar: Feria -> Cliente -> Tipo1 -> Categoria
-  const grouped = {};
-  pptosFiltered.forEach(p => {
-    if (!grouped[p.feria]) grouped[p.feria] = {};
-    if (!grouped[p.feria][p.cliente]) grouped[p.feria][p.cliente] = {};
-    if (!grouped[p.feria][p.cliente][p.tipo]) grouped[p.feria][p.cliente][p.tipo] = {};
-    if (!grouped[p.feria][p.cliente][p.tipo][p.categoria]) grouped[p.feria][p.cliente][p.tipo][p.categoria] = [];
-    grouped[p.feria][p.cliente][p.tipo][p.categoria].push(p);
+  // Estructura de elementos (filas)
+  const estructura = {
+    'INGRESOS': ['VENTAS'],
+    'GASTOS': {
+      'CARPINTERIA': ['OTROS', 'ALMACEN', 'VIGAS', 'LACADOS', 'ESTRUCTURA', 'TABIQUES'],
+      'MONTAJE': ['MONTAJE', 'DESMONTAJE', 'EXTERNOS'],
+      'MATERIAL': ['MATERIAL'],
+      'TRANSPORTE': ['TRANSPORTE'],
+      'GASTOS VIAJE': ['GASTOS VIAJE'],
+      'GRAFICA': ['GRAFICA'],
+      'MOB ALQ': ['MOB ALQ'],
+      'MOB COMPRA': ['MOB COMPRA'],
+      'ELECTRICIDAD': ['ELECTRICIDAD'],
+      'SERVICIOS FERIALES': ['SERVICIOS FERIALES']
+    }
+  };
+
+  pptoMatrixData = {};
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:#f3f4f6;"><th style="padding:10px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Concepto</th><th style="padding:10px;text-align:right;border:1px solid #e5e7eb;font-weight:600;">Importe €</th></tr></thead>';
+  html += '<tbody>';
+
+  // INGRESOS
+  let ingresoTotal = 0;
+  html += '<tr style="background:rgba(16,185,129,0.1);"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;color:#10b981;">INGRESOS</td><td id="pptoMatrixIngTotal" style="padding:10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:#10b981;">0€</td></tr>';
+
+  estructura.INGRESOS.forEach(item => {
+    const key = `INGRESO|${item}`;
+    const existing = allBudgets.find(b => b.feria === feria && b.cliente === cliente && b.tipo === '1. INGRESO' && b.categoria === item);
+    const value = existing ? parseFloat(existing.importe) || 0 : 0;
+    pptoMatrixData[key] = value;
+    ingresoTotal += value;
+
+    html += `<tr style="background:#ffffff;"><td style="padding:10px;border:1px solid #e5e7eb;padding-left:30px;color:#4b5563;">${item}</td>`;
+    html += `<td style="padding:10px;border:1px solid #e5e7eb;text-align:right;"><input type="number" step="0.01" value="${value}" data-key="${key}" onchange="updatePptoMatrix('${key}', this.value)" style="width:120px;padding:6px;border:1px solid #e5e7eb;border-radius:0;background:#f8f9fa;" /></td></tr>`;
+  });
+
+  // GASTOS
+  let gastoTotal = 0;
+  html += '<tr style="background:rgba(239,68,68,0.1);"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;">GASTOS</td><td id="pptoMatrixGastTotal" style="padding:10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:#ef4444;">0€</td></tr>';
+
+  Object.entries(estructura.GASTOS).forEach(([catPrincipal, subItems]) => {
+    let catTotal = 0;
+    subItems.forEach(item => {
+      const key = `GASTO|${catPrincipal}|${item}`;
+      const existing = allBudgets.find(b => b.feria === feria && b.cliente === cliente && b.tipo === '2. GASTO' && b.categoria === item);
+      const value = existing ? parseFloat(existing.importe) || 0 : 0;
+      pptoMatrixData[key] = value;
+      catTotal += value;
+      gastoTotal += value;
+
+      html += `<tr style="background:#ffffff;"><td style="padding:10px;border:1px solid #e5e7eb;padding-left:${catPrincipal === item ? '30px' : '50px'};color:#4b5563;">${item}</td>`;
+      html += `<td style="padding:10px;border:1px solid #e5e7eb;text-align:right;"><input type="number" step="0.01" value="${value}" data-key="${key}" onchange="updatePptoMatrix('${key}', this.value)" style="width:120px;padding:6px;border:1px solid #e5e7eb;border-radius:0;background:#f8f9fa;" /></td></tr>`;
+    });
+  });
+
+  // TOTALES
+  const margen = ingresoTotal - gastoTotal;
+  const margenPct = ingresoTotal > 0 ? ((margen / ingresoTotal) * 100).toFixed(1) : 0;
+  const marginColor = margenPct >= 50 ? '#10b981' : margenPct >= 25 ? '#f59e0b' : '#ef4444';
+
+  html += '<tr style="background:#f3f4f6;border-top:2px solid #d1d5db;"><td style="padding:10px;border:1px solid #e5e7eb;font-weight:600;">MARGEN TOTAL</td><td style="padding:10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:' + marginColor + ';">' + fmt(margen) + ' (' + margenPct + '%)</td></tr>';
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  // Actualizar totales
+  updatePptoMatrixTotals();
+}
+
+function updatePptoMatrix(key, value) {
+  pptoMatrixData[key] = parseFloat(value) || 0;
+  updatePptoMatrixTotals();
+}
+
+function updatePptoMatrixTotals() {
+  let ingresoTotal = 0, gastoTotal = 0;
+  Object.entries(pptoMatrixData).forEach(([key, value]) => {
+    if (key.startsWith('INGRESO')) ingresoTotal += value;
+    else gastoTotal += value;
+  });
+
+  const margen = ingresoTotal - gastoTotal;
+  const margenPct = ingresoTotal > 0 ? ((margen / ingresoTotal) * 100).toFixed(1) : 0;
+  const marginColor = margenPct >= 50 ? '#10b981' : margenPct >= 25 ? '#f59e0b' : '#ef4444';
+
+  document.getElementById('pptoMatrixIngTotal').textContent = fmt(ingresoTotal);
+  document.getElementById('pptoMatrixGastTotal').textContent = fmt(gastoTotal);
+
+  const margenRow = document.evaluate("//tr[contains(.,'MARGEN TOTAL')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+  if (margenRow) {
+    margenRow.cells[1].textContent = fmt(margen) + ' (' + margenPct + '%)';
+    margenRow.cells[1].style.color = marginColor;
+  }
+}
+
+async function savePptoMatrix() {
+  const feria = document.getElementById('pptoMatrixFeria')?.value || '';
+  const cliente = document.getElementById('pptoMatrixCliente')?.value || '';
+
+  if (!feria || !cliente) {
+    alert('❌ Selecciona Feria y Cliente');
+    return;
+  }
+
+  try {
+    // Eliminar presupuestos previos para esta feria/cliente
+    const existing = allBudgets.filter(b => b.feria === feria && b.cliente === cliente);
+    for (const b of existing) {
+      if (b.id) await db.collection('budgets').doc(b.id).delete();
+    }
+
+    // Guardar nuevos presupuestos
+    const year = pptoSelYears.size > 0 ? Array.from(pptoSelYears)[0] : new Date().getFullYear();
+
+    for (const [key, value] of Object.entries(pptoMatrixData)) {
+      if (value <= 0) continue;
+      const parts = key.split('|');
+      const tipo = parts[0] === 'INGRESO' ? '1. INGRESO' : '2. GASTO';
+      const categoria = parts[parts.length - 1];
+
+      await db.collection('budgets').add({
+        year: year,
+        feria: feria,
+        cliente: cliente,
+        tipo: tipo,
+        categoria: categoria,
+        descripcion: categoria,
+        importe: value,
+        createdAt: new Date(),
+        createdBy: currentUser?.email || 'unknown'
+      });
+    }
+
+    pptoLoaded = false;
+    await initPresupuestos();
+    alert('✓ Presupuesto guardado correctamente');
+  } catch (error) {
+    alert('❌ Error: ' + error.message);
+  }
+}
+
+function togglePptoMatrixZeros() {
+  const inputs = document.querySelectorAll('#pptoMatrixContainer input[type="number"]');
+  const hideZeros = !document.body.classList.contains('pptoHideZeros');
+
+  inputs.forEach(input => {
+    const row = input.closest('tr');
+    if (parseFloat(input.value) === 0) {
+      row.style.display = hideZeros ? 'none' : '';
+    }
+  });
+
+  document.body.classList.toggle('pptoHideZeros', hideZeros);
+}
+
+// ── SEGUIMIENTO (CRM) ──
+function renderPptoCrm(filtered) {
+  const container = document.getElementById('pptoCrmContainer');
+
+  // Agrupar por estado
+  const byStatus = {
+    'EN CREACION': [],
+    'ENVIADO': [],
+    'NEGOCIACION': [],
+    'ACEPTADO': [],
+    'RECHAZADO': []
+  };
+
+  filtered.forEach(b => {
+    const status = b.status || 'EN CREACION';
+    if (!byStatus[status]) byStatus[status] = [];
+    byStatus[status].push(b);
   });
 
   let html = '';
-  Object.entries(grouped).forEach(([feria, clientes]) => {
-    html += `<div style="margin-bottom:24px;border:1px solid #222;border-radius:6px;overflow:hidden;">`;
-    html += `<div style="padding:12px;background:rgba(0,0,0,0.5);font-weight:600;color:#1f2937;font-size:14px;"><strong>${feria}</strong></div>`;
+  Object.entries(byStatus).forEach(([status, items]) => {
+    if (items.length === 0) return;
 
-    Object.entries(clientes).forEach(([cliente, tipos]) => {
-      html += `<div style="padding:12px;background:rgba(227,160,23,0.05);border-top:1px solid #222;font-size:13px;color:#d4af37;"><strong>${cliente}</strong></div>`;
+    html += `<div>
+      <h3 style="font-size:13px;color:#4b5563;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">${status} (${items.length})</h3>
+      <div style="display:grid;gap:12px;">`;
 
-      Object.entries(tipos).forEach(([tipo, categorias]) => {
-        html += `<div style="padding:12px;background:rgba(255,255,255,0.02);border-top:1px solid #222;cursor:pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';">`;
-        let tipoTotal = 0;
-        Object.values(categorias).forEach(items => items.forEach(p => tipoTotal += parseFloat(p.importe) || 0));
-        html += `<div style="display:flex;justify-content:space-between;align-items:center;"><span>${tipo}</span><span style="color:#4b5563;font-weight:500;">${fmt(tipoTotal)}</span></div>`;
-        html += `</div>`;
-        html += `<div style="display:none;">`;
+    items.forEach(b => {
+      const createdDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      const daysAgo = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
+      const opacity = Math.min(1, 0.6 + (daysAgo / 100));
 
-        Object.entries(categorias).forEach(([cat, items]) => {
-          html += `<table style="width:100%;font-size:12px;margin:8px 12px;">`;
-          html += `<thead style="border-bottom:1px solid #d1d5db;"><tr style="color:#4b5563;"><th style="text-align:left;padding:6px;">Categoría</th><th style="text-align:left;padding:6px;">Descripción</th><th style="text-align:right;padding:6px;">Presupuestado</th></tr></thead>`;
-          html += `<tbody>`;
-          items.forEach(p => {
-            html += `<tr style="border-bottom:1px solid #222;"><td style="padding:6px;">${cat}</td><td style="padding:6px;">${p.descripcion}</td><td style="text-align:right;padding:6px;color:#10b981;">${fmt(p.importe)}</td></tr>`;
-          });
-          html += `</tbody></table>`;
-        });
-
-        html += `</div>`;
-      });
+      html += `<div style="padding:12px;border:1px solid #e5e7eb;border-radius:6px;opacity:${opacity};transition:opacity 0.2s;cursor:pointer;" onclick="editPptoCrmStatus(this, '${b.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
+          <div>
+            <p style="font-weight:600;color:#1f2937;margin-bottom:4px;">${b.cliente}</p>
+            <p style="font-size:12px;color:#6b7280;">${b.feria} (${b.year})</p>
+          </div>
+          <span style="font-size:11px;background:#f3f4f6;padding:4px 8px;border-radius:0;color:#6b7280;">${daysAgo}d</span>
+        </div>
+        <select onchange="updatePptoCrmStatus('${b.id}', this.value)" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:0;background:#f8f9fa;font-size:12px;">
+          <option value="EN CREACION" ${status === 'EN CREACION' ? 'selected' : ''}>EN CREACION</option>
+          <option value="ENVIADO" ${status === 'ENVIADO' ? 'selected' : ''}>ENVIADO</option>
+          <option value="NEGOCIACION" ${status === 'NEGOCIACION' ? 'selected' : ''}>NEGOCIACION</option>
+          <option value="ACEPTADO" ${status === 'ACEPTADO' ? 'selected' : ''}>ACEPTADO</option>
+          <option value="RECHAZADO" ${status === 'RECHAZADO' ? 'selected' : ''}>RECHAZADO</option>
+        </select>
+      </div>`;
     });
 
-    html += `</div>`;
+    html += `</div></div>`;
   });
 
-  block.innerHTML = html;
+  if (html === '') {
+    html = '<p style="padding:20px;color:#6b7280;text-align:center;">No hay presupuestos en estos filtros</p>';
+  }
+
+  container.innerHTML = html;
+}
+
+async function updatePptoCrmStatus(budgetId, newStatus) {
+  try {
+    await db.collection('budgets').doc(budgetId).update({
+      status: newStatus,
+      statusUpdatedAt: new Date()
+    });
+    pptoLoaded = false;
+    await initPresupuestos();
+  } catch (error) {
+    alert('❌ Error: ' + error.message);
+  }
 }
 
 function renderPptoAvance(pptosFiltered) {
   const block = document.getElementById('pptoDetalle');
   const pptoIngPpto = document.getElementById('pptoIngPpto');
   const pptoIngReal = document.getElementById('pptoIngReal');
-  const pptoIngDev = document.getElementById('pptoIngDev');
-  const pptoIngDevPct = document.getElementById('pptoIngDevPct');
+  const pptoGastPpto = document.getElementById('pptoGastPpto');
+  const pptoGastReal = document.getElementById('pptoGastReal');
 
   if (!pptosFiltered || pptosFiltered.length === 0) {
     block.innerHTML = '<p style="padding:20px;color:#6b7280;">No hay presupuestos</p>';
     pptoIngPpto.textContent = '—';
     pptoIngReal.textContent = '—';
-    pptoIngDev.textContent = '—';
-    pptoIngDevPct.textContent = '—';
+    pptoGastPpto.textContent = '—';
+    pptoGastReal.textContent = '—';
     return;
   }
 
@@ -2574,14 +2725,11 @@ function renderPptoAvance(pptosFiltered) {
   const pptoMargen = pptoBudget - pptoGastos;
   const realMargen = realIncome - realGastos;
   const marginDev = realMargen - pptoMargen;
-  const marginPct = pptoMargen > 0 ? ((marginDev / pptoMargen) * 100).toFixed(1) : 0;
 
   pptoIngPpto.textContent = fmt(pptoBudget);
   pptoIngReal.textContent = fmt(realIncome);
-  pptoIngDev.textContent = fmt(realIncome - pptoBudget);
-  pptoIngDev.classList.toggle('red', (realIncome - pptoBudget) < 0);
-  pptoIngDev.classList.toggle('green', (realIncome - pptoBudget) >= 0);
-  pptoIngDevPct.textContent = fmt(((realIncome - pptoBudget) / (pptoBudget || 1)) * 100, 'percent');
+  pptoGastPpto.textContent = fmt(pptoGastos);
+  pptoGastReal.textContent = fmt(realGastos);
 
   let html = `<h3 style="font-size:13px;color:#4b5563;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;">Ingresos Detallado</h3>`;
   html += `<table style="width:100%;font-size:12px;margin-bottom:24px;border-collapse:collapse;">`;
@@ -2646,56 +2794,6 @@ function renderPptoAvance(pptosFiltered) {
   html += `</tbody></table>`;
 
   block.innerHTML = html;
-}
-
-async function savePptoPartida() {
-  const tipo = document.getElementById('pptoNewTipo1')?.value || '';
-  const categoria = document.getElementById('pptoNewTipo2')?.value || '';
-  const detalle = document.getElementById('pptoNewDetalle')?.value || '';
-  const importe = parseFloat(document.getElementById('pptoNewImporte')?.value) || 0;
-
-  // Validación de campos obligatorios
-  if (!tipo || !categoria || !detalle || !importe) {
-    alert('❌ Completa todos los campos (Tipo, Categoría, Descripción e Importe)');
-    return;
-  }
-
-  if (importe <= 0) {
-    alert('❌ El importe debe ser mayor a 0');
-    return;
-  }
-
-  try {
-    // Si hay filtros activos, usar esos datos, si no, usar valores por defecto
-    const feriaSeleccionada = pptoSelFerias.size > 0 ? Array.from(pptoSelFerias)[0] : 'General';
-    const clienteSeleccionado = pptoSelClientes.size > 0 ? Array.from(pptoSelClientes)[0] : 'General';
-    const yearSeleccionado = pptoSelYears.size > 0 ? Array.from(pptoSelYears)[0] : new Date().getFullYear();
-
-    await db.collection('budgets').add({
-      year: yearSeleccionado,
-      feria: feriaSeleccionada,
-      cliente: clienteSeleccionado,
-      descripcion: detalle,
-      tipo: tipo,
-      categoria: categoria,
-      importe: importe,
-      createdAt: new Date(),
-      createdBy: currentUser?.email || 'unknown'
-    });
-
-    // Limpiar formulario
-    document.getElementById('pptoNewTipo1').value = '1. INGRESO';
-    document.getElementById('pptoNewTipo2').value = 'VENTA';
-    document.getElementById('pptoNewDetalle').value = '';
-    document.getElementById('pptoNewImporte').value = '';
-
-    // Recargar datos
-    pptoLoaded = false;
-    await initPresupuestos();
-    alert('✓ Partida de presupuesto guardada correctamente');
-  } catch (error) {
-    alert('❌ Error al guardar: ' + error.message);
-  }
 }
 
 // ── ADMIN ─────────────────────────────────────────────────
