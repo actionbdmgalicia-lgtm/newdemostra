@@ -655,56 +655,28 @@ tr:hover { background:#f3f4f6; }
     <div id="dashboard-page" class="page-section active">
       <h2 style="font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:24px;color:#1f2937;">Dashboard</h2>
 
-      <!-- INGRESOS POR AÑO -->
-      <div class="card" style="margin-bottom:24px;">
-        <div class="card-header"><h3>Ingresos por Año</h3></div>
-        <div class="card-body" style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>Año</th><th style="text-align:right;">Total Ingresos</th></tr>
-            </thead>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;">
+        <!-- ANÁLISIS POR AÑO (IZQUIERDA) -->
+        <div class="card">
+          <div class="card-header"><h3>Análisis por Año</h3></div>
+          <div class="card-body" style="overflow-x:auto;padding:0;">
             <tbody id="dashIngresosPorAno"></tbody>
-          </table>
+          </div>
         </div>
-      </div>
 
-      <!-- GASTOS POR AÑO -->
-      <div class="card" style="margin-bottom:24px;">
-        <div class="card-header"><h3>Gastos por Año</h3></div>
-        <div class="card-body" style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>Año</th><th style="text-align:right;">Total Gastos</th></tr>
-            </thead>
-            <tbody id="dashGastosPorAno"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- MARGEN POR AÑO -->
-      <div class="card" style="margin-bottom:24px;">
-        <div class="card-header"><h3>Margen por Año</h3></div>
-        <div class="card-body" style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>Año</th><th style="text-align:right;">Margen</th></tr>
-            </thead>
-            <tbody id="dashMargenPorAno"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- DESGLOSE DE GASTOS POR CATEGORÍA -->
-      <div class="card">
-        <div class="card-header"><h3>Desglose de Gastos por Categoría</h3></div>
-        <div class="card-body" style="overflow-x:auto;">
-          <table>
-            <thead>
-              <tr><th>Categoría</th><th style="text-align:right;">Total Gasto</th></tr>
-            </thead>
+        <!-- TOP GASTOS POR CATEGORÍA (DERECHA) -->
+        <div class="card">
+          <div class="card-header"><h3>Top Gastos por Categoría</h3></div>
+          <div class="card-body" style="overflow-x:auto;padding:0;">
             <tbody id="dashGastosPorCategoria"></tbody>
-          </table>
+          </div>
         </div>
+      </div>
+
+      <!-- Elementos ocultos para compatibilidad -->
+      <div style="display:none;">
+        <tbody id="dashGastosPorAno"></tbody>
+        <tbody id="dashMargenPorAno"></tbody>
       </div>
     </div>
 
@@ -1149,17 +1121,49 @@ async function init() {
 // Enriquecer costos con type2 si falta
 function enrichCostsWithType2() {
   allCosts.forEach(c => {
-    // Si no tiene type2, intentar múltiples fallbacks
+    // Si no tiene type2, asignar categoría automática
     if (!c.type2) {
-      if (c.category && c.category !== 'GENERAL') {
-        c.type2 = c.category;
-      } else if (c.tipo) {
-        c.type2 = c.tipo;
-      } else {
-        c.type2 = 'OTROS';
-      }
+      c.type2 = autoCategorizeExpense(c);
     }
   });
+}
+
+function autoCategorizeExpense(cost) {
+  // Intentar usar categorías existentes
+  if (cost.category && cost.category !== 'GENERAL' && cost.category !== '') {
+    return cost.category;
+  }
+  if (cost.tipo && cost.tipo !== '' && cost.tipo !== 'GASTO' && cost.tipo !== 'VENTAS') {
+    return cost.tipo;
+  }
+
+  // Auto-categorizar basado en descripción
+  const desc = (cost.description || '').toLowerCase();
+  const prov = (cost.provider || '').toLowerCase();
+  const fullText = desc + ' ' + prov;
+
+  const patterns = {
+    'CARPINTERIA': ['carpint', 'madera', 'corte', 'sierra', 'taller madera'],
+    'MONTAJE': ['montaje', 'estructura', 'montadera', 'armado', 'ensamblaje'],
+    'MATERIAL': ['material', 'lona', 'tela', 'papel', 'carton', 'vinyl', 'pvc'],
+    'TRANSPORTE': ['transport', 'flete', 'logistic', 'carga', 'descarga', 'envio'],
+    'GRAFICA': ['grafica', 'impresion', 'imprenta', 'diseño', 'rotulo', 'serigraf'],
+    'ELECTRICIDAD': ['electric', 'luz', 'corriente', 'cable', 'enchuf', 'amplificador'],
+    'MOB ALQ': ['alquiler', 'renta', 'mobiliario', 'silla', 'mesa', 'mostrador'],
+    'MOB COMPRA': ['compra', 'mueble', 'mostrador compra', 'estanteria'],
+    'GASTOS VIAJE': ['viaje', 'hotel', 'hospedaje', 'gasolina', 'combustible', 'peaje'],
+    'GASTOS GG': ['telefono', 'internet', 'seguro', 'administrativo', 'general'],
+  };
+
+  for (const [cat, keywords] of Object.entries(patterns)) {
+    for (const kw of keywords) {
+      if (fullText.includes(kw)) {
+        return cat;
+      }
+    }
+  }
+
+  return 'OTROS';
 }
 
 function loadDashboard() {
@@ -1177,32 +1181,9 @@ function loadDashboard() {
 
   const years = Object.keys(byYear).map(Number).sort();
 
-  // TABLA: INGRESOS POR AÑO
-  let htmlIng = '';
-  years.forEach(year => {
-    let ing = 0;
-    byYear[year].forEach(c => {
-      const a = parseFloat(c.amount) || 0;
-      if (c.type === 'VENTAS' || a > 0) ing += Math.abs(a);
-    });
-    htmlIng += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;">${fmt(ing)}</td></tr>`;
-  });
-  document.getElementById('dashIngresosPorAno').innerHTML = htmlIng || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+  // ── SECCIÓN 1: ANÁLISIS POR AÑO ─────────────────
+  let htmlYears = '<table style="width:100%;border-collapse:collapse;"><thead style="background:#f3f4f6;border-bottom:2px solid #d1d5db;"><tr style="color:#1f2937;font-weight:700;"><th style="text-align:left;padding:12px;">Año</th><th style="text-align:right;padding:12px;color:#10b981;">Ingresos</th><th style="text-align:right;padding:12px;color:#ef4444;">Gastos</th><th style="text-align:right;padding:12px;color:#f59e0b;">Margen</th></tr></thead><tbody>';
 
-  // TABLA: GASTOS POR AÑO
-  let htmlGas = '';
-  years.forEach(year => {
-    let gas = 0;
-    byYear[year].forEach(c => {
-      const a = parseFloat(c.amount) || 0;
-      if (c.type !== 'VENTAS' && a <= 0) gas += Math.abs(a);
-    });
-    htmlGas += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;">${fmt(gas)}</td></tr>`;
-  });
-  document.getElementById('dashGastosPorAno').innerHTML = htmlGas || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
-
-  // TABLA: MARGEN POR AÑO
-  let htmlMar = '';
   years.forEach(year => {
     let ing = 0, gas = 0;
     byYear[year].forEach(c => {
@@ -1211,11 +1192,14 @@ function loadDashboard() {
       else gas += Math.abs(a);
     });
     const mar = ing - gas;
-    htmlMar += `<tr><td>${year}</td><td style="text-align:right;font-weight:600;color:${mar >= 0 ? '#15803d' : '#dc2626'};">${fmt(mar)}</td></tr>`;
+    const marColor = mar >= 0 ? '#10b981' : '#ef4444';
+    htmlYears += `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px;font-weight:600;color:#1f2937;">${year}</td><td style="padding:12px;text-align:right;color:#10b981;font-weight:600;">${fmt(ing)}</td><td style="padding:12px;text-align:right;color:#ef4444;font-weight:600;">${fmt(gas)}</td><td style="padding:12px;text-align:right;color:${marColor};font-weight:600;">${fmt(mar)}</td></tr>`;
   });
-  document.getElementById('dashMargenPorAno').innerHTML = htmlMar || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+  htmlYears += '</tbody></table>';
 
-  // TABLA: GASTOS POR CATEGORÍA
+  document.getElementById('dashIngresosPorAno').parentElement.parentElement.innerHTML = `<div style="overflow-x:auto;">${htmlYears}</div>`;
+
+  // ── SECCIÓN 2: TOP GASTOS POR CATEGORÍA ────────
   const byCategory = {};
   allCosts.forEach(c => {
     const a = parseFloat(c.amount) || 0;
@@ -1226,12 +1210,29 @@ function loadDashboard() {
     }
   });
 
-  const cats = Object.entries(byCategory)
+  const totalGastos = Object.values(byCategory).reduce((a, b) => a + b, 0);
+  const catEntries = Object.entries(byCategory)
     .sort((a, b) => b[1] - a[1])
-    .map(([cat, total]) => `<tr><td>${cat}</td><td style="text-align:right;font-weight:600;">${fmt(total)}</td></tr>`)
-    .join('');
+    .slice(0, 8);
 
-  document.getElementById('dashGastosPorCategoria').innerHTML = cats || '<tr><td colspan="2" class="empty">Sin datos</td></tr>';
+  let htmlCats = '<table style="width:100%;border-collapse:collapse;"><thead style="background:#f3f4f6;border-bottom:2px solid #d1d5db;"><tr style="color:#1f2937;font-weight:700;"><th style="text-align:left;padding:12px;">Categoría</th><th style="text-align:right;padding:12px;">Monto</th><th style="text-align:right;padding:12px;">%</th></tr></thead><tbody>';
+
+  catEntries.forEach(([cat, amount]) => {
+    const pct = totalGastos > 0 ? ((amount / totalGastos) * 100).toFixed(1) : 0;
+    htmlCats += `<tr style="border-bottom:1px solid #e5e7eb;"><td style="padding:12px;color:#1f2937;font-weight:500;">${cat}</td><td style="padding:12px;text-align:right;color:#ef4444;font-weight:600;">${fmt(amount)}</td><td style="padding:12px;text-align:right;color:#6b7280;">${fmt(pct, 'percent')}</td></tr>`;
+  });
+
+  if (catEntries.length === 0) {
+    htmlCats += '<tr><td colspan="3" style="padding:12px;text-align:center;color:#9ca3af;">Sin datos</td></tr>';
+  }
+
+  htmlCats += '</tbody></table>';
+
+  document.getElementById('dashGastosPorCategoria').parentElement.parentElement.innerHTML = `<div style="overflow-x:auto;">${htmlCats}</div>`;
+
+  // Limpiar tablas antiguas (ahora no necesarias)
+  document.getElementById('dashGastosPorAno').innerHTML = '';
+  document.getElementById('dashMargenPorAno').innerHTML = '';
 }
 
 // ── VISUALIZACIÓN ─────────────────────────────────────────
@@ -1954,6 +1955,11 @@ function renderCargaContent() {
     c.feriaId === feriaId && c.clientId === cSelCliente
   );
 
+  // Asegurar que tienen type2
+  cargaCosts.forEach(c => {
+    if (!c.type2) c.type2 = autoCategorizeExpense(c);
+  });
+
   let html = '';
 
   // Encabezado con nombre del cliente
@@ -1981,13 +1987,25 @@ function renderCargaContent() {
   content.innerHTML = html;
 
   // Agregar event listeners para expandibles
-  document.querySelectorAll('.carga-group-header').forEach(el => {
+  document.querySelectorAll('.group-header').forEach(el => {
+    el.addEventListener('click', function() {
+      this.parentElement.classList.toggle('expanded');
+      const body = this.nextElementSibling;
+      const isOpen = body.style.display !== 'none';
+      body.style.display = isOpen ? 'none' : 'block';
+      const arrow = this.querySelector('.material-symbols-outlined');
+      if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+    });
+  });
+
+  // Agregar event listeners para categorías (tipo)
+  document.querySelectorAll('.tipo-header').forEach(el => {
     el.addEventListener('click', function() {
       const body = this.nextElementSibling;
       const isOpen = body.style.display !== 'none';
       body.style.display = isOpen ? 'none' : 'block';
       const arrow = this.querySelector('.material-symbols-outlined');
-      arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+      if (arrow) arrow.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
     });
   });
 
