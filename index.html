@@ -803,18 +803,7 @@ tr:hover { background:#f3f4f6; }
         <div class="card" style="margin-bottom:24px;">
           <div class="card-header"><h2>Matriz de Presupuestos</h2></div>
           <div class="card-body">
-            <div class="form-group" style="margin-bottom:16px;">
-              <div class="form-field"><label>Feria</label>
-                <select id="pptoMatrixFeria" onchange="buildPptoMatrixTable()">
-                  <option value="">Selecciona...</option>
-                </select>
-              </div>
-              <div class="form-field"><label>Cliente</label>
-                <select id="pptoMatrixCliente" onchange="buildPptoMatrixTable()">
-                  <option value="">Selecciona...</option>
-                </select>
-              </div>
-            </div>
+            <div id="pptoMatrixClientesContainer" style="margin-bottom:16px;"></div>
             <div style="overflow-x:auto;">
               <div id="pptoMatrixContainer" style="border:1px solid #e5e7eb;border-radius:6px;"></div>
             </div>
@@ -1046,6 +1035,8 @@ let allBudgets = [], pptoLoaded = false;
 let pptoSelYears = new Set(), pptoSelFerias = new Set(), pptoSelClientes = new Set();
 let pptoSubActual = 'crear';
 let pptoMatrixData = {}; // Para edición en tabla matriz
+let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
+let pptoClienteStatus = {}; // Estados de presupuestos por cliente: {feria|cliente: 'PENDIENTE_ENVIO'|'ACEPTADO'|'RECHAZADO'}
 
 function switchPage(page) {
   document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -2454,6 +2445,7 @@ function showChartCarga(costs) {
 async function initPresupuestos() {
   if (!pptoLoaded) {
     try {
+      // Cargar presupuestos
       const snap = await db.collection('budgets').get();
       allBudgets = [];
       snap.forEach(d => {
@@ -2483,6 +2475,19 @@ async function initPresupuestos() {
       if (allBudgets.length > 0) {
         console.log('🔍 Muestra:', allBudgets[0]);
       }
+
+      // Cargar estados de presupuestos
+      try {
+        const statusSnap = await db.collection('presupuesto_status').get();
+        pptoClienteStatus = {};
+        statusSnap.forEach(d => {
+          const data = d.data();
+          pptoClienteStatus[d.id] = data.estado || 'PENDIENTE_ENVIO';
+        });
+      } catch (e) {
+        console.warn('Error cargando estados de presupuestos:', e);
+      }
+      pptoLoaded = true;
     } catch (e) {
       console.error('Error cargando presupuestos:', e);
     }
@@ -2506,9 +2511,10 @@ function buildPptoFilters() {
 
   if (pptoSelFerias.size > 0) {
     const clientes = [...new Set(allBudgets.filter(b=>pptoSelYears.has(b.year) && pptoSelFerias.has(b.feria)).map(b=>b.cliente).filter(Boolean))].sort();
-    renderChips('pptoChipsCliente', [null,...clientes], c=>c||'TODOS', c=>c===null?pptoSelClientes.size===0:pptoSelClientes.has(c), c=>{if(c===null)pptoSelClientes.clear();else pptoSelClientes.has(c)?pptoSelClientes.delete(c):pptoSelClientes.add(c);buildPptoFilters();});
+    renderChips('pptoChipsCliente', [null,...clientes], c=>c||'TODOS', c=>c===null?pptoSelClientes.size===0:pptoSelClientes.has(c), c=>{if(c===null)pptoSelClientes.clear();else pptoSelClientes.has(c)?pptoSelClientes.delete(c):pptoSelClientes.add(c);pptoMatrixClienteSelected='';buildPptoFilters();});
   } else {
     document.getElementById('pptoChipsCliente').innerHTML = '';
+    pptoMatrixClienteSelected = '';
   }
 }
 
@@ -2530,24 +2536,51 @@ function renderPptoIniciales(filtered) {
 }
 
 function buildPptoMatrixSelects() {
-  const ferias = [...new Set(allBudgets.map(b => b.feria).filter(Boolean))].sort();
-  console.log('🏢 Ferias encontradas:', ferias, 'de', allBudgets.length, 'presupuestos');
-  const feriaSelect = document.getElementById('pptoMatrixFeria');
-  feriaSelect.innerHTML = '<option value="">Selecciona...</option>' + ferias.map(f => `<option value="${f}">${f}</option>`).join('');
+  // Obtener clientes del filtro actual (por feria seleccionada)
+  let clientesSet = new Set();
+  if (pptoSelFerias.size > 0) {
+    allBudgets.filter(b => pptoSelFerias.has(b.feria)).forEach(b => {
+      if (b.cliente) clientesSet.add(b.cliente);
+    });
+  } else {
+    allBudgets.forEach(b => {
+      if (b.cliente) clientesSet.add(b.cliente);
+    });
+  }
 
-  const clientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
-  console.log('👥 Clientes encontrados:', clientes);
-  const clienteSelect = document.getElementById('pptoMatrixCliente');
-  clienteSelect.innerHTML = '<option value="">Selecciona...</option>' + clientes.map(c => `<option value="${c}">${c}</option>`).join('');
+  const clientes = [...clientesSet].sort();
+  const container = document.getElementById('pptoMatrixClientesContainer');
+
+  // Renderizar chips de cliente
+  let html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">';
+  html += '<label style="align-self:center;font-weight:600;color:#374151;">Cliente:</label>';
+  clientes.forEach(c => {
+    const isSelected = pptoMatrixClienteSelected === c;
+    const style = isSelected
+      ? 'background:#e3a017;color:white;border:2px solid #d97706;'
+      : 'background:#f3f4f6;color:#374151;border:2px solid #e5e7eb;';
+    html += `<button onclick="selectPptoMatrixCliente('${c}')" style="padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-weight:600;transition:all 0.2s;${style}">${c}</button>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+
+  if (pptoMatrixClienteSelected && clientes.includes(pptoMatrixClienteSelected)) {
+    buildPptoMatrixTable();
+  }
+}
+
+function selectPptoMatrixCliente(cliente) {
+  pptoMatrixClienteSelected = cliente;
+  buildPptoMatrixSelects();
 }
 
 function buildPptoMatrixTable() {
-  const feria = document.getElementById('pptoMatrixFeria')?.value || '';
-  const cliente = document.getElementById('pptoMatrixCliente')?.value || '';
   const container = document.getElementById('pptoMatrixContainer');
+  const feria = pptoSelFerias.size > 0 ? Array.from(pptoSelFerias)[0] : '';
+  const cliente = pptoMatrixClienteSelected;
 
   if (!feria || !cliente) {
-    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">Selecciona una Feria y Cliente</p>';
+    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">Selecciona una Feria y Cliente arriba</p>';
     return;
   }
 
@@ -2569,7 +2602,20 @@ function buildPptoMatrixTable() {
   };
 
   pptoMatrixData = {};
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+
+  // Estado del cliente
+  const statusKey = `${feria}|${cliente}`;
+  const estadoActual = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+
+  let html = '<div style="margin-bottom:16px;display:flex;gap:16px;align-items:center;">';
+  html += '<label style="font-weight:600;color:#374151;">Estado del Presupuesto:</label>';
+  html += '<select id="pptoClienteEstado" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">';
+  html += `<option value="PENDIENTE_ENVIO" ${estadoActual === 'PENDIENTE_ENVIO' ? 'selected' : ''}>Pendiente de ENVIO</option>`;
+  html += `<option value="ACEPTADO" ${estadoActual === 'ACEPTADO' ? 'selected' : ''}>ACEPTADO</option>`;
+  html += `<option value="RECHAZADO" ${estadoActual === 'RECHAZADO' ? 'selected' : ''}>RECHAZADO</option>`;
+  html += '</select></div>';
+
+  html += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
   html += '<thead><tr style="background:#f3f4f6;"><th style="padding:10px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Concepto</th><th style="padding:10px;text-align:right;border:1px solid #e5e7eb;font-weight:600;">Importe €</th></tr></thead>';
   html += '<tbody>';
 
@@ -2655,12 +2701,29 @@ function updatePptoMatrixTotals() {
 }
 
 async function savePptoMatrix() {
-  const feria = document.getElementById('pptoMatrixFeria')?.value || '';
-  const cliente = document.getElementById('pptoMatrixCliente')?.value || '';
+  const feria = pptoSelFerias.size > 0 ? Array.from(pptoSelFerias)[0] : '';
+  const cliente = pptoMatrixClienteSelected;
+  const estado = document.getElementById('pptoClienteEstado')?.value || 'PENDIENTE_ENVIO';
 
   if (!feria || !cliente) {
     alert('❌ Selecciona Feria y Cliente');
     return;
+  }
+
+  // Guardar estado del cliente
+  const statusKey = `${feria}|${cliente}`;
+  pptoClienteStatus[statusKey] = estado;
+
+  try {
+    await db.collection('presupuesto_status').doc(statusKey).set({
+      feria: feria,
+      cliente: cliente,
+      estado: estado,
+      updatedAt: new Date(),
+      updatedBy: currentUser?.email || 'unknown'
+    });
+  } catch (e) {
+    console.warn('Error guardando estado:', e);
   }
 
   try {
