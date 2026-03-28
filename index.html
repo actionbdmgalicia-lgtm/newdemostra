@@ -805,8 +805,7 @@ tr:hover { background:#f3f4f6; }
           <div class="card-body">
             <div id="pptoClientesTableContainer" style="margin-bottom:16px;"></div>
             <div style="margin-top:16px;display:flex;gap:8px;">
-              <button class="btn btn-secondary" onclick="openAddClienteModal()" style="background:#10b981;color:#ffffff;border:none;">➕ Agregar Cliente</button>
-              <button class="btn btn-secondary" onclick="openImportPresupuestosModal()" style="margin-left:auto;background:#3b82f6;color:#ffffff;border:none;">📥 Importar SEAFOOD</button>
+              <button class="btn btn-secondary" onclick="openImportPresupuestosModal()" style="background:#3b82f6;color:#ffffff;border:none;">📥 Importar SEAFOOD</button>
             </div>
           </div>
         </div>
@@ -2554,38 +2553,81 @@ function renderPptoIniciales(filtered) {
 
   const clientes = [...clientesSet].sort();
 
-  if (clientes.length === 0) {
-    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">No hay clientes en esta feria</p>';
-    return;
-  }
-
   // Renderizar tabla de clientes
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">';
   html += '<thead><tr style="background:#f3f4f6;"><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Cliente</th><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Estado</th><th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">Acciones</th></tr></thead>';
   html += '<tbody>';
 
-  clientes.forEach(cliente => {
-    const statusKey = `${feria}|${cliente}`;
-    const estado = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+  if (clientes.length === 0) {
+    html += '<tr><td colspan="3" style="padding:20px;text-align:center;color:#6b7280;">No hay clientes en esta feria aún</td></tr>';
+  } else {
+    clientes.forEach(cliente => {
+      const statusKey = `${feria}|${cliente}`;
+      const estado = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
 
-    const estadoColor = {
-      'PENDIENTE_ENVIO': '#f59e0b',
-      'ACEPTADO': '#10b981',
-      'RECHAZADO': '#ef4444'
-    }[estado] || '#6b7280';
+      const estadoColor = {
+        'PENDIENTE_ENVIO': '#f59e0b',
+        'ACEPTADO': '#10b981',
+        'RECHAZADO': '#ef4444'
+      }[estado] || '#6b7280';
 
-    const estadoLabel = {
-      'PENDIENTE_ENVIO': 'Pendiente de ENVIO',
-      'ACEPTADO': 'Aceptado',
-      'RECHAZADO': 'Rechazado'
-    }[estado] || estado;
+      const estadoLabel = {
+        'PENDIENTE_ENVIO': 'Pendiente de ENVIO',
+        'ACEPTADO': 'Aceptado',
+        'RECHAZADO': 'Rechazado'
+      }[estado] || estado;
 
-    html += `<tr style="background:#ffffff;"><td style="padding:12px;border:1px solid #e5e7eb;color:#1f2937;font-weight:500;">${cliente}</td>`;
-    html += `<td style="padding:12px;border:1px solid #e5e7eb;"><span style="background:${estadoColor}20;color:${estadoColor};padding:4px 8px;border-radius:4px;font-weight:600;font-size:12px;">${estadoLabel}</span></td>`;
-    html += `<td style="padding:12px;border:1px solid #e5e7eb;text-align:center;"><button onclick="editarEstadoCliente('${feria}','${cliente}')" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:500;font-size:12px;">Cambiar Estado</button></td></tr>`;
-  });
+      html += `<tr style="background:#ffffff;"><td style="padding:12px;border:1px solid #e5e7eb;color:#1f2937;font-weight:500;">${cliente}</td>`;
+      html += `<td style="padding:12px;border:1px solid #e5e7eb;"><span style="background:${estadoColor}20;color:${estadoColor};padding:4px 8px;border-radius:4px;font-weight:600;font-size:12px;">${estadoLabel}</span></td>`;
+      html += `<td style="padding:12px;border:1px solid #e5e7eb;text-align:center;"><button onclick="editarEstadoCliente('${feria}','${cliente}')" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:500;font-size:12px;">Cambiar Estado</button></td></tr>`;
+    });
+  }
 
   html += '</tbody></table>';
+
+  // Formulario para agregar nuevo cliente
+  html += '<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:20px;background:#f9fafb;">';
+  html += '<h4 style="margin:0 0 16px 0;color:#1f2937;font-weight:600;">Agregar Cliente</h4>';
+
+  // Obtener todos los clientes existentes (para copiar)
+  const todosClientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
+
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
+
+  // Opción 1: Copiar de cliente existente
+  html += '<div>';
+  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Copiar de Cliente Existente</label>';
+  html += '<select id="copiarClienteSelect" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">';
+  html += '<option value="">-- Selecciona para copiar --</option>';
+  todosClientes.forEach(c => {
+    html += `<option value="${c}">${c}</option>`;
+  });
+  html += '</select>';
+  html += '</div>';
+
+  // Opción 2: Crear nombre nuevo
+  html += '<div>';
+  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">O Crear Cliente Nuevo</label>';
+  html += '<input id="nuevoClienteNombre" type="text" placeholder="Nombre del nuevo cliente..." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">';
+  html += '</div>';
+
+  html += '</div>';
+
+  // Estado inicial
+  html += '<div style="margin-bottom:16px;">';
+  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Estado Inicial</label>';
+  html += '<select id="nuevoClienteEstado" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">';
+  html += '<option value="PENDIENTE_ENVIO">Pendiente de ENVIO</option>';
+  html += '<option value="ACEPTADO">Aceptado</option>';
+  html += '<option value="RECHAZADO">Rechazado</option>';
+  html += '</select>';
+  html += '</div>';
+
+  // Botón agregar
+  html += `<button onclick="agregarClienteAFeria('${feria}')" style="padding:10px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;">➕ Agregar Cliente a Feria</button>`;
+
+  html += '</div>';
+
   container.innerHTML = html;
 }
 
@@ -2635,85 +2677,81 @@ function guardarEstadoCliente(feria, cliente) {
   applyPptoFilters();
 }
 
-// Agregar nuevo cliente
-function openAddClienteModal() {
-  if (pptoSelFerias.size === 0) {
-    alert('Selecciona una Feria primero');
-    return;
-  }
-
-  const feria = Array.from(pptoSelFerias)[0];
-
-  const modal = document.createElement('div');
-  modal.id = 'addClienteModal';
-  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
-
-  const content = document.createElement('div');
-  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
-
-  content.innerHTML = `
-    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">Agregar Nuevo Cliente</h3>
-    <p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Feria: <strong>${feria}</strong></p>
-
-    <div style="margin-bottom:16px;">
-      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Nombre del Cliente</label>
-      <input id="nuevoClienteNombre" type="text" placeholder="Ej: NUEVO CLIENTE S.L." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">
-    </div>
-
-    <div style="margin-bottom:16px;">
-      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Estado Inicial</label>
-      <select id="nuevoClienteEstado" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
-        <option value="PENDIENTE_ENVIO">Pendiente de ENVIO</option>
-        <option value="ACEPTADO">Aceptado</option>
-        <option value="RECHAZADO">Rechazado</option>
-      </select>
-    </div>
-
-    <div style="display:flex;gap:8px;justify-content:flex-end;">
-      <button onclick="document.getElementById('addClienteModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
-      <button onclick="guardarNuevoCliente('${feria}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Agregar</button>
-    </div>
-  `;
-
-  modal.appendChild(content);
-  document.body.appendChild(modal);
-  document.getElementById('nuevoClienteNombre').focus();
-}
-
-function guardarNuevoCliente(feria) {
-  const nombre = document.getElementById('nuevoClienteNombre').value.trim();
+// Agregar cliente a la feria
+function agregarClienteAFeria(feria) {
+  const copiarDe = document.getElementById('copiarClienteSelect').value;
+  const nombreNuevo = document.getElementById('nuevoClienteNombre').value.trim();
   const estado = document.getElementById('nuevoClienteEstado').value;
 
-  if (!nombre) {
-    alert('Ingresa el nombre del cliente');
+  // Validar que se seleccione uno de los dos
+  if (!copiarDe && !nombreNuevo) {
+    alert('Selecciona un cliente para copiar O ingresa un nombre nuevo');
     return;
   }
 
-  // Crear documento dummy para que aparezca en la lista
-  const doc = {
-    id: 'temp_' + Date.now(),
-    year: 2026,
-    feria: feria,
-    cliente: nombre,
-    tipo: '1. INGRESO',
-    categoria: 'VENTAS',
-    descripcion: 'Cliente creado',
-    importe: 0,
-    status: 'ACTIVO',
-    createdAt: new Date(),
-    createdBy: auth.currentUser?.email || 'admin@demostra.com'
-  };
+  if (copiarDe && nombreNuevo) {
+    alert('Selecciona UNO de los dos: copiar existente O crear nuevo');
+    return;
+  }
 
-  // Agregar a allBudgets (en memoria)
-  allBudgets.push(doc);
+  const clienteNombre = copiarDe || nombreNuevo;
+
+  // Verificar que no exista ya en esta feria
+  const yaExiste = allBudgets.find(b => b.feria === feria && b.cliente === clienteNombre);
+  if (yaExiste) {
+    alert('Este cliente ya existe en esta feria');
+    return;
+  }
+
+  if (copiarDe) {
+    // Copiar datos del cliente existente
+    const datosClienteOriginal = allBudgets.filter(b => b.cliente === copiarDe);
+
+    datosClienteOriginal.forEach(original => {
+      const doc = {
+        id: 'temp_' + Date.now() + '_' + Math.random(),
+        year: original.year || 2026,
+        feria: feria,
+        cliente: clienteNombre,
+        tipo: original.tipo,
+        categoria: original.categoria,
+        descripcion: original.descripcion,
+        importe: original.importe || 0,
+        status: original.status || 'ACTIVO',
+        createdAt: new Date(),
+        createdBy: auth.currentUser?.email || 'admin@demostra.com'
+      };
+      allBudgets.push(doc);
+    });
+  } else {
+    // Crear cliente nuevo desde 0
+    const doc = {
+      id: 'temp_' + Date.now(),
+      year: 2026,
+      feria: feria,
+      cliente: clienteNombre,
+      tipo: '1. INGRESO',
+      categoria: 'VENTAS',
+      descripcion: 'Cliente creado',
+      importe: 0,
+      status: 'ACTIVO',
+      createdAt: new Date(),
+      createdBy: auth.currentUser?.email || 'admin@demostra.com'
+    };
+    allBudgets.push(doc);
+  }
 
   // Guardar estado del cliente
-  const statusKey = `${feria}|${nombre}`;
+  const statusKey = `${feria}|${clienteNombre}`;
   pptoClienteStatus[statusKey] = estado;
   localStorage.setItem('pptoClienteStatus_' + statusKey, estado);
 
-  // Cerrar modal y actualizar
-  document.getElementById('addClienteModal').remove();
+  // Limpiar formulario y actualizar
+  document.getElementById('copiarClienteSelect').value = '';
+  document.getElementById('nuevoClienteNombre').value = '';
+  document.getElementById('nuevoClienteEstado').value = 'PENDIENTE_ENVIO';
+
+  // Actualizar vista
   applyPptoFilters();
 }
 
