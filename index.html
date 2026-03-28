@@ -1030,6 +1030,8 @@ let pptoSubActual = 'iniciales';
 let pptoMatrixData = {}; // Para edición en tabla matriz
 let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
 let pptoClienteStatus = {}; // Estados de presupuestos por cliente: {feria|cliente: 'PENDIENTE_ENVIO'|'ACEPTADO'|'RECHAZADO'}
+let pptoHideZeros = false;
+let pptoCollapsed = new Set();
 
 function switchPage(page) {
   document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -2524,8 +2526,8 @@ function applyPptoFilters() {
   else if (pptoSubActual === 'avance') renderPptoAvance(filtered);
 }
 
-// ── PRESUPUESTOS INICIALES (Matriz: filas=conceptos, columnas=clientes) ──
-const PPTO_ESTRUCTURA = [
+// ── PRESUPUESTOS INICIALES (Matriz dinámica: filas=items, columnas=clientes) ──
+const PPTO_ESTRUCTURA_LEGACY = [
   { tipo: 'INGRESO', grupo: 'INGRESOS', categoria: 'VENTAS', label: 'Ventas', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
   { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'CARPINTERIA', label: 'Carpintería', color: '#ef4444', bg: '#fff' },
   { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'MONTAJE', label: 'Montaje', color: '#ef4444', bg: '#fafafa', calcKey: 'montaje' },
@@ -2545,13 +2547,180 @@ function renderPptoIniciales(filtered) {
   if (!container) return;
 
   if (pptoSelFerias.size === 0) {
-    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver los presupuestos</p>';
+    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;font-size:15px;">👆 Selecciona una Feria arriba para ver los presupuestos</p>';
     return;
   }
 
   const feria = Array.from(pptoSelFerias)[0];
+  const budgetsFeria = allBudgets.filter(b => b.feria === feria && b.cliente !== 'TOTAL');
+  const clientes = [...new Set(budgetsFeria.map(b => b.cliente).filter(Boolean))].sort();
 
-  // Obtener clientes únicos de esta feria
+  const CATS_GASTOS = ['CARPINTERIA','MONTAJE','ALQUILER','COMPRA','MATERIAL','TRANSPORTE','GASTOS VIAJE','GRAFICA','ELECTRICIDAD','SERVICIOS FERIALES','OTROS'];
+  const CATS_CON_CALC = ['MONTAJE'];
+  const thB = 'padding:10px 12px;border:1px solid #e5e7eb;font-weight:700;background:#f3f4f6;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;';
+
+  let html = `<div style="padding:10px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;">
+    <button onclick="pptoHideZeros=!pptoHideZeros;applyPptoFilters()"
+      style="padding:5px 12px;border:1px solid ${pptoHideZeros?'#374151':'#e5e7eb'};border-radius:6px;background:${pptoHideZeros?'#374151':'white'};color:${pptoHideZeros?'white':'#6b7280'};cursor:pointer;font-size:12px;font-weight:600;">
+      ${pptoHideZeros?'👁 Mostrar todos':'🚫 Ocultar items 0'}
+    </button>
+    <span style="color:#9ca3af;font-size:12px;">${clientes.length} clientes · ${budgetsFeria.length} líneas</span>
+  </div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">`;
+
+  // ─ THEAD: nombres + estados ─
+  html += `<thead><tr>`;
+  html += `<th style="${thB}text-align:left;min-width:220px;position:sticky;left:0;z-index:3;">Concepto</th>`;
+  clientes.forEach(c => { html += `<th style="${thB}text-align:right;min-width:130px;">${c}</th>`; });
+  html += `<th style="${thB}text-align:right;min-width:110px;">TOTAL</th>`;
+  html += `<th style="${thB}text-align:center;width:44px;"><button onclick="abrirAgregarCliente('${feria}')" title="Agregar cliente" style="width:26px;height:26px;border-radius:50%;background:#10b981;color:white;border:none;cursor:pointer;font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;">+</button></th>`;
+  html += `</tr><tr style="background:#f9fafb;">`;
+  html += `<td style="padding:5px 12px;border:1px solid #e5e7eb;font-size:11px;color:#9ca3af;position:sticky;left:0;background:#f9fafb;">Estado</td>`;
+  clientes.forEach(c => {
+    const sk = `${feria}|${c}`;
+    const est = pptoClienteStatus[sk]||'PENDIENTE_ENVIO';
+    const EC = {PENDIENTE_ENVIO:'#f59e0b',ACEPTADO:'#10b981',RECHAZADO:'#ef4444'};
+    const EL = {PENDIENTE_ENVIO:'Pendiente ENVIO',ACEPTADO:'Aceptado',RECHAZADO:'Rechazado'};
+    html += `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;">
+      <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}</div>
+      <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:1px 7px;background:#e5e7eb;color:#374151;border:none;border-radius:4px;cursor:pointer;font-size:10px;">Cambiar</button>
+    </td>`;
+  });
+  html += `<td style="border:1px solid #e5e7eb;"></td><td style="border:1px solid #e5e7eb;"></td></tr></thead><tbody>`;
+
+  const totIng={}, totGasto={};
+  clientes.forEach(c=>{totIng[c]=0;totGasto[c]=0;});
+
+  // ─ INGRESOS ─
+  html += `<tr style="background:rgba(16,185,129,0.12);"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#10b981;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">▼ INGRESOS</td></tr>`;
+  let ingItems = [...new Set(budgetsFeria.filter(b=>b.tipo&&(b.tipo.includes('INGRESO'))).map(b=>b.descripcion||b.detalle||'Ventas').filter(Boolean))].sort();
+  if (!ingItems.length) ingItems=['Ventas'];
+  ingItems.forEach(desc=>{
+    const vals={};
+    clientes.forEach(c=>{
+      const m=budgetsFeria.find(b=>b.cliente===c&&(b.tipo||'').includes('INGRESO')&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc==='Ventas')));
+      vals[c]=m?Math.abs(parseFloat(m.importe)||0):0;
+      totIng[c]+=vals[c];
+    });
+    if(pptoHideZeros&&clientes.every(c=>!vals[c]))return;
+    const rowT=clientes.reduce((s,c)=>s+vals[c],0);
+    html+=`<tr style="background:rgba(16,185,129,0.03);" onmouseover="this.style.background='rgba(16,185,129,0.08)'" onmouseout="this.style.background='rgba(16,185,129,0.03)'">`;
+    html+=`<td style="padding:6px 14px 6px 28px;border:1px solid #e5e7eb;color:#374151;position:sticky;left:0;background:rgba(16,185,129,0.03);">${desc}</td>`;
+    clientes.forEach(c=>{
+      const v=vals[c]; const eid=`pi_${feria}_${c}_${desc}`.replace(/[^a-z0-9]/gi,'_');
+      html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0"
+        style="width:90px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#10b981;font-size:13px;background:transparent;"
+        onfocus="this.style.borderColor='#10b981';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'"
+        onchange="updatePptoCelda('${feria}','${c}','INGRESO','VENTAS','${desc.replace(/'/g,"\\'")}',this.value)"/></td>`;
+    });
+    html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#10b981;">${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+  });
+
+  // ─ GASTOS por categoría ─
+  html+=`<tr style="background:rgba(239,68,68,0.08);"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#ef4444;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">▼ GASTOS</td></tr>`;
+  CATS_GASTOS.forEach(cat=>{
+    const catItems=[...new Set(budgetsFeria.filter(b=>b.categoria===cat||(b.tipo2||'').toUpperCase()===cat).map(b=>b.descripcion||b.detalle||cat).filter(Boolean))].sort();
+    if(!catItems.length) catItems.push(cat);
+    const hasVals=catItems.some(desc=>clientes.some(c=>{
+      const m=budgetsFeria.find(b=>b.cliente===c&&(b.categoria===cat||(b.tipo2||'').toUpperCase()===cat)&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc===cat)));
+      return m&&Math.abs(parseFloat(m.importe)||0)>0;
+    }));
+    if(pptoHideZeros&&!hasVals) return;
+    const isCol=pptoCollapsed.has(cat);
+    html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')"><td colspan="${clientes.length+3}" style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">${isCol?'▶':'▼'} ${cat}</td></tr>`;
+    if(!isCol){
+      catItems.forEach(desc=>{
+        const vals={};
+        clientes.forEach(c=>{
+          const m=budgetsFeria.find(b=>b.cliente===c&&(b.categoria===cat||(b.tipo2||'').toUpperCase()===cat)&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc===cat)));
+          vals[c]=m?Math.abs(parseFloat(m.importe)||0):0;
+          totGasto[c]+=vals[c];
+        });
+        if(pptoHideZeros&&clientes.every(c=>!vals[c]))return;
+        const rowT=clientes.reduce((s,c)=>s+vals[c],0);
+        const hasC=CATS_CON_CALC.includes(cat);
+        html+=`<tr style="background:white;" onmouseover="this.style.background='#fef2f2'" onmouseout="this.style.background='white'">`;
+        html+=`<td style="padding:6px 14px 6px 32px;border:1px solid #e5e7eb;color:#374151;position:sticky;left:0;background:white;">${desc}</td>`;
+        clientes.forEach(c=>{
+          const v=vals[c]; const eid=`pg_${feria}_${c}_${cat}_${desc}`.replace(/[^a-z0-9]/gi,'_');
+          const safeDesc=desc.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+          const cb=hasC?`<button onclick="event.stopPropagation();openMontajeForCell('${feria}','${c}','${cat}','${safeDesc}','${eid}')" title="Calculadora montaje" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px;">🧮</button>`:'';
+          html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;">${cb}<input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0"
+            style="width:80px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#ef4444;font-size:13px;background:transparent;"
+            onfocus="this.style.borderColor='#ef4444';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'"
+            onchange="updatePptoCelda('${feria}','${c}','GASTO','${cat}','${desc.replace(/'/g,"\\'")}',this.value)"/></div></td>`;
+        });
+        html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">-${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+      });
+    }
+  });
+
+  // ─ TOTALES ─
+  const tI=clientes.reduce((s,c)=>s+totIng[c],0), tG=clientes.reduce((s,c)=>s+totGasto[c],0);
+  const totRow=(label,vals,total,color,prefix='')=>{
+    let r=`<tr style="background:${color}20;border-top:2px solid ${color}"><td style="padding:9px 14px;border:1px solid #e5e7eb;font-weight:700;color:${color};font-size:13px;position:sticky;left:0;background:${color}20;">${label}</td>`;
+    clientes.forEach(c=>{ r+=`<td style="padding:9px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:${color};">${prefix}${fmt(vals[c])}</td>`; });
+    r+=`<td style="padding:9px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:${color};">${prefix}${fmt(total)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+    return r;
+  };
+  html+=totRow('TOTAL INGRESOS',totIng,tI,'#10b981');
+  html+=totRow('TOTAL GASTOS',totGasto,tG,'#ef4444','-');
+
+  // Margen
+  html+=`<tr style="background:#fff8e1;"><td style="padding:9px 14px;border:1px solid #e5e7eb;font-weight:700;color:#e3a017;position:sticky;left:0;background:#fff8e1;">MARGEN</td>`;
+  clientes.forEach(c=>{const m=totIng[c]-totGasto[c];const col=m>=0?'#10b981':'#ef4444';html+=`<td style="padding:9px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:${col};">${fmt(m)}</td>`;});
+  const tM=tI-tG; html+=`<td style="padding:9px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:${tM>=0?'#10b981':'#ef4444'};">${fmt(tM)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+
+  // % Margen
+  html+=`<tr style="background:#fff8e1;"><td style="padding:7px 14px;border:1px solid #e5e7eb;font-weight:600;color:#e3a017;font-size:12px;position:sticky;left:0;background:#fff8e1;">% MARGEN</td>`;
+  clientes.forEach(c=>{const p=totIng[c]>0?(totIng[c]-totGasto[c])/totIng[c]*100:0;const col=p>=0?'#10b981':'#ef4444';html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:${col};">${fmt(p,'%')}</td>`;});
+  const tP=tI>0?(tI-tG)/tI*100:0; html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:${tP>=0?'#10b981':'#ef4444'};">${fmt(tP,'%')}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+
+  html+=`</tbody></table></div>`;
+  container.innerHTML = html;
+}
+
+function togglePpoCategoria(cat) {
+  if (pptoCollapsed.has(cat)) pptoCollapsed.delete(cat); else pptoCollapsed.add(cat);
+  applyPptoFilters();
+}
+
+function openMontajeForCell(feria, cliente, cat, desc, eid) {
+  openMontajeCalculator(v => {
+    const el = document.getElementById(eid);
+    if (el) { el.value = v; }
+    updatePptoCelda(feria, cliente, 'GASTO', cat, desc, v);
+  });
+}
+
+async function updatePptoCelda(feria, cliente, tipo, categoria, descripcion, valor) {
+  const importe = Math.abs(parseFloat(valor)||0);
+  const tipoFull = tipo==='INGRESO' ? '1. INGRESO' : '2. GASTO';
+  const year = Array.from(pptoSelYears)[0] || new Date().getFullYear();
+  const idx = allBudgets.findIndex(b => b.feria===feria && b.cliente===cliente && b.categoria===categoria && (b.descripcion===descripcion||b.detalle===descripcion));
+  const doc = { year, feria, cliente, tipo:tipoFull, categoria, descripcion, importe, status:'ACTIVO', updatedAt:new Date() };
+  try {
+    if (idx>=0 && allBudgets[idx].id && !allBudgets[idx].id.startsWith('temp_')) {
+      await db.collection('budgets').doc(allBudgets[idx].id).update({importe, updatedAt:new Date()});
+      allBudgets[idx].importe = importe;
+    } else if (idx>=0) {
+      const ref = await db.collection('budgets').add(doc);
+      allBudgets[idx] = {...doc, id:ref.id};
+    } else {
+      const ref = await db.collection('budgets').add(doc);
+      allBudgets.push({...doc, id:ref.id});
+    }
+  } catch(e) { console.error('Error guardando presupuesto:', e); }
+}
+
+// ── FUNCIÓN LEGACY (no usada) ──
+function renderPptoInicialesLEGACY(filtered) {
+  const container = document.getElementById('pptoMatrizContainer');
+  if (!container) return;
+  if (pptoSelFerias.size === 0) {
+    container.innerHTML = '<p>Selecciona una Feria</p>';
+    return;
+  }
+  const feria = Array.from(pptoSelFerias)[0];
   const clientesSet = new Set();
   allBudgets.filter(b => b.feria === feria).forEach(b => { if (b.cliente) clientesSet.add(b.cliente); });
   const clientes = [...clientesSet].sort();
