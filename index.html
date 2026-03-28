@@ -801,16 +801,12 @@ tr:hover { background:#f3f4f6; }
       <!-- SUB 1: PRESUPUESTOS INICIALES (Tabla Matriz) -->
       <div id="ppto-sub-iniciales" class="sub-tab-content active">
         <div class="card" style="margin-bottom:24px;">
-          <div class="card-header"><h2>Matriz de Presupuestos</h2></div>
+          <div class="card-header"><h2>Clientes por Feria</h2></div>
           <div class="card-body">
-            <div id="pptoMatrixClientesContainer" style="margin-bottom:16px;"></div>
-            <div style="overflow-x:auto;">
-              <div id="pptoMatrixContainer" style="border:1px solid #e5e7eb;border-radius:6px;"></div>
-            </div>
+            <div id="pptoClientesTableContainer" style="margin-bottom:16px;"></div>
             <div style="margin-top:16px;display:flex;gap:8px;">
-              <button class="btn btn-primary" onclick="savePptoMatrix()">Guardar Presupuesto</button>
-              <button class="btn btn-secondary" onclick="togglePptoMatrixZeros()">Ocultar items 0</button>
-              <button class="btn btn-secondary" onclick="openImportPresupuestosModal()" style="margin-left:auto;background:#10b981;color:#ffffff;border:none;">📥 Importar SEAFOOD</button>
+              <button class="btn btn-secondary" onclick="openAddClienteModal()" style="background:#10b981;color:#ffffff;border:none;">➕ Agregar Cliente</button>
+              <button class="btn btn-secondary" onclick="openImportPresupuestosModal()" style="margin-left:auto;background:#3b82f6;color:#ffffff;border:none;">📥 Importar SEAFOOD</button>
             </div>
           </div>
         </div>
@@ -1189,6 +1185,15 @@ async function init() {
   });
 
   enrichCostsWithType2();
+
+  // Cargar estado de clientes desde localStorage
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key.startsWith('pptoClienteStatus_')) {
+      const statusKey = key.replace('pptoClienteStatus_', '');
+      pptoClienteStatus[statusKey] = localStorage.getItem(key);
+    }
+  }
 
   // Migración automática en background (sin bloquear UI)
   migrateAllCosts().then(() => {
@@ -2529,49 +2534,187 @@ function applyPptoFilters() {
   else if (pptoSubActual === 'avance') renderPptoAvance(filtered);
 }
 
-// ── PRESUPUESTOS INICIALES (Tabla Matriz) ──
+// ── PRESUPUESTOS INICIALES (Tabla de Clientes) ──
 function renderPptoIniciales(filtered) {
-  buildPptoMatrixSelects();
-  buildPptoMatrixTable();
-}
+  const container = document.getElementById('pptoClientesTableContainer');
 
-function buildPptoMatrixSelects() {
-  // Obtener clientes del filtro actual (por feria seleccionada)
-  let clientesSet = new Set();
-  if (pptoSelFerias.size > 0) {
-    allBudgets.filter(b => pptoSelFerias.has(b.feria)).forEach(b => {
-      if (b.cliente) clientesSet.add(b.cliente);
-    });
-  } else {
-    allBudgets.forEach(b => {
-      if (b.cliente) clientesSet.add(b.cliente);
-    });
+  // Si no hay feria seleccionada, mostrar mensaje
+  if (pptoSelFerias.size === 0) {
+    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver sus clientes</p>';
+    return;
   }
+
+  const feria = Array.from(pptoSelFerias)[0];
+
+  // Obtener clientes únicos de esta feria
+  const clientesSet = new Set();
+  allBudgets.filter(b => b.feria === feria).forEach(b => {
+    if (b.cliente) clientesSet.add(b.cliente);
+  });
 
   const clientes = [...clientesSet].sort();
-  const container = document.getElementById('pptoMatrixClientesContainer');
 
-  // Renderizar chips de cliente
-  let html = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">';
-  html += '<label style="align-self:center;font-weight:600;color:#374151;">Cliente:</label>';
-  clientes.forEach(c => {
-    const isSelected = pptoMatrixClienteSelected === c;
-    const style = isSelected
-      ? 'background:#e3a017;color:white;border:2px solid #d97706;'
-      : 'background:#f3f4f6;color:#374151;border:2px solid #e5e7eb;';
-    html += `<button onclick="selectPptoMatrixCliente('${c}')" style="padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-weight:600;transition:all 0.2s;${style}">${c}</button>`;
-  });
-  html += '</div>';
-  container.innerHTML = html;
-
-  if (pptoMatrixClienteSelected && clientes.includes(pptoMatrixClienteSelected)) {
-    buildPptoMatrixTable();
+  if (clientes.length === 0) {
+    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">No hay clientes en esta feria</p>';
+    return;
   }
+
+  // Renderizar tabla de clientes
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">';
+  html += '<thead><tr style="background:#f3f4f6;"><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Cliente</th><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Estado</th><th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">Acciones</th></tr></thead>';
+  html += '<tbody>';
+
+  clientes.forEach(cliente => {
+    const statusKey = `${feria}|${cliente}`;
+    const estado = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+
+    const estadoColor = {
+      'PENDIENTE_ENVIO': '#f59e0b',
+      'ACEPTADO': '#10b981',
+      'RECHAZADO': '#ef4444'
+    }[estado] || '#6b7280';
+
+    const estadoLabel = {
+      'PENDIENTE_ENVIO': 'Pendiente de ENVIO',
+      'ACEPTADO': 'Aceptado',
+      'RECHAZADO': 'Rechazado'
+    }[estado] || estado;
+
+    html += `<tr style="background:#ffffff;"><td style="padding:12px;border:1px solid #e5e7eb;color:#1f2937;font-weight:500;">${cliente}</td>`;
+    html += `<td style="padding:12px;border:1px solid #e5e7eb;"><span style="background:${estadoColor}20;color:${estadoColor};padding:4px 8px;border-radius:4px;font-weight:600;font-size:12px;">${estadoLabel}</span></td>`;
+    html += `<td style="padding:12px;border:1px solid #e5e7eb;text-align:center;"><button onclick="editarEstadoCliente('${feria}','${cliente}')" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:500;font-size:12px;">Cambiar Estado</button></td></tr>`;
+  });
+
+  html += '</tbody></table>';
+  container.innerHTML = html;
 }
 
-function selectPptoMatrixCliente(cliente) {
-  pptoMatrixClienteSelected = cliente;
-  buildPptoMatrixSelects();
+// Editar estado del cliente
+function editarEstadoCliente(feria, cliente) {
+  const statusKey = `${feria}|${cliente}`;
+  const estadoActual = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+
+  const modal = document.createElement('div');
+  modal.id = 'editStatusModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+
+  content.innerHTML = `
+    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">Cambiar Estado del Presupuesto</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;"><strong>${cliente}</strong> - ${feria}</p>
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Estado</label>
+      <select id="newStatus" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
+        <option value="PENDIENTE_ENVIO" ${estadoActual === 'PENDIENTE_ENVIO' ? 'selected' : ''}>Pendiente de ENVIO</option>
+        <option value="ACEPTADO" ${estadoActual === 'ACEPTADO' ? 'selected' : ''}>Aceptado</option>
+        <option value="RECHAZADO" ${estadoActual === 'RECHAZADO' ? 'selected' : ''}>Rechazado</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('editStatusModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+      <button onclick="guardarEstadoCliente('${feria}','${cliente}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Guardar</button>
+    </div>
+  `;
+
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
+function guardarEstadoCliente(feria, cliente) {
+  const statusKey = `${feria}|${cliente}`;
+  const nuevoEstado = document.getElementById('newStatus').value;
+  pptoClienteStatus[statusKey] = nuevoEstado;
+
+  // Guardar en localStorage
+  localStorage.setItem('pptoClienteStatus_' + statusKey, nuevoEstado);
+
+  // Cerrar modal y actualizar vista
+  document.getElementById('editStatusModal').remove();
+  applyPptoFilters();
+}
+
+// Agregar nuevo cliente
+function openAddClienteModal() {
+  if (pptoSelFerias.size === 0) {
+    alert('Selecciona una Feria primero');
+    return;
+  }
+
+  const feria = Array.from(pptoSelFerias)[0];
+
+  const modal = document.createElement('div');
+  modal.id = 'addClienteModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:500px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+
+  content.innerHTML = `
+    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">Agregar Nuevo Cliente</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Feria: <strong>${feria}</strong></p>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Nombre del Cliente</label>
+      <input id="nuevoClienteNombre" type="text" placeholder="Ej: NUEVO CLIENTE S.L." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Estado Inicial</label>
+      <select id="nuevoClienteEstado" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
+        <option value="PENDIENTE_ENVIO">Pendiente de ENVIO</option>
+        <option value="ACEPTADO">Aceptado</option>
+        <option value="RECHAZADO">Rechazado</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('addClienteModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+      <button onclick="guardarNuevoCliente('${feria}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Agregar</button>
+    </div>
+  `;
+
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  document.getElementById('nuevoClienteNombre').focus();
+}
+
+function guardarNuevoCliente(feria) {
+  const nombre = document.getElementById('nuevoClienteNombre').value.trim();
+  const estado = document.getElementById('nuevoClienteEstado').value;
+
+  if (!nombre) {
+    alert('Ingresa el nombre del cliente');
+    return;
+  }
+
+  // Crear documento dummy para que aparezca en la lista
+  const doc = {
+    id: 'temp_' + Date.now(),
+    year: 2026,
+    feria: feria,
+    cliente: nombre,
+    tipo: '1. INGRESO',
+    categoria: 'VENTAS',
+    descripcion: 'Cliente creado',
+    importe: 0,
+    status: 'ACTIVO',
+    createdAt: new Date(),
+    createdBy: auth.currentUser?.email || 'admin@demostra.com'
+  };
+
+  // Agregar a allBudgets (en memoria)
+  allBudgets.push(doc);
+
+  // Guardar estado del cliente
+  const statusKey = `${feria}|${nombre}`;
+  pptoClienteStatus[statusKey] = estado;
+  localStorage.setItem('pptoClienteStatus_' + statusKey, estado);
+
+  // Cerrar modal y actualizar
+  document.getElementById('addClienteModal').remove();
+  applyPptoFilters();
 }
 
 function buildPptoMatrixTable() {
