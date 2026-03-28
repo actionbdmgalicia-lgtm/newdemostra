@@ -792,21 +792,19 @@ tr:hover { background:#f3f4f6; }
           <span class="filter-label">FERIA</span>
           <div class="chips" id="pptoChipsFeria"></div>
         </div>
-        <div class="filter-group">
-          <span class="filter-label">CLIENTE</span>
-          <div class="chips" id="pptoChipsCliente"></div>
-        </div>
+        <div class="chips" id="pptoChipsCliente" style="display:none;"></div>
       </div>
 
       <!-- SUB 1: PRESUPUESTOS INICIALES (Tabla Matriz) -->
       <div id="ppto-sub-iniciales" class="sub-tab-content active">
         <div class="card" style="margin-bottom:24px;">
-          <div class="card-header"><h2>Clientes por Feria</h2></div>
-          <div class="card-body">
-            <div id="pptoClientesTableContainer" style="margin-bottom:16px;"></div>
-            <div style="margin-top:16px;display:flex;gap:8px;">
-              <button class="btn btn-secondary" onclick="openImportPresupuestosModal()" style="background:#3b82f6;color:#ffffff;border:none;">📥 Importar SEAFOOD</button>
-            </div>
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+            <h2>Presupuestos por Cliente</h2>
+            <button onclick="openImportPresupuestosModal()" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">📥 Importar SEAFOOD</button>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div id="pptoMatrizContainer" style="overflow-x:auto;"></div>
+          </div>
           </div>
         </div>
       </div>
@@ -2502,24 +2500,17 @@ async function initPresupuestos() {
 
 function buildPptoFilters() {
   const years = [...new Set(allBudgets.map(b=>b.year).filter(Boolean))].sort();
-  renderChips('pptoChipsYear', [null,...years], y=>y?String(y):'TODOS', y=>y===null?pptoSelYears.size===0:pptoSelYears.has(y), y=>{if(y===null)pptoSelYears.clear();else pptoSelYears.has(y)?pptoSelYears.delete(y):pptoSelYears.add(y);pptoSelFerias.clear();pptoSelClientes.clear();buildPptoFilters();});
+  renderChips('pptoChipsYear', [null,...years], y=>y?String(y):'TODOS', y=>y===null?pptoSelYears.size===0:pptoSelYears.has(y), y=>{if(y===null)pptoSelYears.clear();else pptoSelYears.has(y)?pptoSelYears.delete(y):pptoSelYears.add(y);pptoSelFerias.clear();buildPptoFilters();});
 
   if (pptoSelYears.size > 0) {
     const ferias = [...new Set(allBudgets.filter(b=>pptoSelYears.has(b.year)).map(b=>b.feria).filter(Boolean))].sort();
-    renderChips('pptoChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===null?pptoSelFerias.size===0:pptoSelFerias.has(f), f=>{if(f===null)pptoSelFerias.clear();else pptoSelFerias.has(f)?pptoSelFerias.delete(f):pptoSelFerias.add(f);pptoSelClientes.clear();buildPptoFilters();});
+    renderChips('pptoChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===null?pptoSelFerias.size===0:pptoSelFerias.has(f), f=>{if(f===null)pptoSelFerias.clear();else pptoSelFerias.has(f)?pptoSelFerias.delete(f):pptoSelFerias.add(f);buildPptoFilters();});
   } else {
     document.getElementById('pptoChipsFeria').innerHTML = '';
-    document.getElementById('pptoChipsCliente').innerHTML = '';
     return;
   }
 
-  if (pptoSelFerias.size > 0) {
-    const clientes = [...new Set(allBudgets.filter(b=>pptoSelYears.has(b.year) && pptoSelFerias.has(b.feria)).map(b=>b.cliente).filter(Boolean))].sort();
-    renderChips('pptoChipsCliente', [null,...clientes], c=>c||'TODOS', c=>c===null?pptoSelClientes.size===0:pptoSelClientes.has(c), c=>{if(c===null)pptoSelClientes.clear();else pptoSelClientes.has(c)?pptoSelClientes.delete(c):pptoSelClientes.add(c);pptoMatrixClienteSelected='';buildPptoFilters();});
-  } else {
-    document.getElementById('pptoChipsCliente').innerHTML = '';
-    pptoMatrixClienteSelected = '';
-  }
+  applyPptoFilters();
 }
 
 function applyPptoFilters() {
@@ -2533,13 +2524,28 @@ function applyPptoFilters() {
   else if (pptoSubActual === 'avance') renderPptoAvance(filtered);
 }
 
-// ── PRESUPUESTOS INICIALES (Tabla de Clientes) ──
-function renderPptoIniciales(filtered) {
-  const container = document.getElementById('pptoClientesTableContainer');
+// ── PRESUPUESTOS INICIALES (Matriz: filas=conceptos, columnas=clientes) ──
+const PPTO_ESTRUCTURA = [
+  { tipo: 'INGRESO', grupo: 'INGRESOS', categoria: 'VENTAS', label: 'Ventas', color: '#10b981', bg: 'rgba(16,185,129,0.08)' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'CARPINTERIA', label: 'Carpintería', color: '#ef4444', bg: '#fff' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'MONTAJE', label: 'Montaje', color: '#ef4444', bg: '#fafafa', calcKey: 'montaje' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'MATERIAL', label: 'Material', color: '#ef4444', bg: '#fff' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'TRANSPORTE', label: 'Transporte', color: '#ef4444', bg: '#fafafa' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'GASTOS VIAJE', label: 'Gastos Viaje', color: '#ef4444', bg: '#fff' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'GRAFICA', label: 'Gráfica', color: '#ef4444', bg: '#fafafa' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'MOB ALQ', label: 'Mob. Alquiler', color: '#ef4444', bg: '#fff' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'MOB COMPRA', label: 'Mob. Compra', color: '#ef4444', bg: '#fafafa' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'ELECTRICIDAD', label: 'Electricidad', color: '#ef4444', bg: '#fff' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'SERVICIOS FERIALES', label: 'Servicios Feriales', color: '#ef4444', bg: '#fafafa' },
+  { tipo: 'GASTO', grupo: 'GASTOS', categoria: 'OTROS', label: 'Otros', color: '#ef4444', bg: '#fff' },
+];
 
-  // Si no hay feria seleccionada, mostrar mensaje
+function renderPptoIniciales(filtered) {
+  const container = document.getElementById('pptoMatrizContainer');
+  if (!container) return;
+
   if (pptoSelFerias.size === 0) {
-    container.innerHTML = '<p style="padding:20px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver sus clientes</p>';
+    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver los presupuestos</p>';
     return;
   }
 
@@ -2547,88 +2553,196 @@ function renderPptoIniciales(filtered) {
 
   // Obtener clientes únicos de esta feria
   const clientesSet = new Set();
-  allBudgets.filter(b => b.feria === feria).forEach(b => {
-    if (b.cliente) clientesSet.add(b.cliente);
-  });
-
+  allBudgets.filter(b => b.feria === feria).forEach(b => { if (b.cliente) clientesSet.add(b.cliente); });
   const clientes = [...clientesSet].sort();
 
-  // Renderizar tabla de clientes
-  let html = '<table style="width:100%;border-collapse:collapse;font-size:14px;margin-bottom:24px;">';
-  html += '<thead><tr style="background:#f3f4f6;"><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Cliente</th><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;">Estado</th><th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:600;">Acciones</th></tr></thead>';
+  // ── Encabezado con clientes como columnas ──
+  const thStyle = 'padding:10px 14px;text-align:right;border:1px solid #e5e7eb;font-weight:700;background:#f3f4f6;white-space:nowrap;min-width:110px;';
+  const thConcepto = 'padding:10px 14px;text-align:left;border:1px solid #e5e7eb;font-weight:700;background:#f3f4f6;min-width:160px;';
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr>';
+  html += `<th style="${thConcepto}">Concepto</th>`;
+  clientes.forEach(c => {
+    html += `<th style="${thStyle}">${c}</th>`;
+  });
+  // Columna vacía para el botón "+"
+  html += `<th style="padding:10px;text-align:center;border:1px solid #e5e7eb;background:#f3f4f6;width:48px;">
+    <button onclick="abrirAgregarCliente('${feria}')" title="Agregar cliente" style="width:32px;height:32px;border-radius:50%;background:#10b981;color:white;border:none;cursor:pointer;font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;">+</button>
+  </th>`;
+  html += '</tr></thead>';
+
   html += '<tbody>';
 
-  if (clientes.length === 0) {
-    html += '<tr><td colspan="3" style="padding:20px;text-align:center;color:#6b7280;">No hay clientes en esta feria aún</td></tr>';
-  } else {
-    clientes.forEach(cliente => {
-      const statusKey = `${feria}|${cliente}`;
-      const estado = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+  let prevGrupo = '';
+  // Totales por cliente
+  const totalesIngreso = {}, totalesGasto = {};
+  clientes.forEach(c => { totalesIngreso[c] = 0; totalesGasto[c] = 0; });
 
-      const estadoColor = {
-        'PENDIENTE_ENVIO': '#f59e0b',
-        'ACEPTADO': '#10b981',
-        'RECHAZADO': '#ef4444'
-      }[estado] || '#6b7280';
-
-      const estadoLabel = {
-        'PENDIENTE_ENVIO': 'Pendiente de ENVIO',
-        'ACEPTADO': 'Aceptado',
-        'RECHAZADO': 'Rechazado'
-      }[estado] || estado;
-
-      html += `<tr style="background:#ffffff;"><td style="padding:12px;border:1px solid #e5e7eb;color:#1f2937;font-weight:500;">${cliente}</td>`;
-      html += `<td style="padding:12px;border:1px solid #e5e7eb;"><span style="background:${estadoColor}20;color:${estadoColor};padding:4px 8px;border-radius:4px;font-weight:600;font-size:12px;">${estadoLabel}</span></td>`;
-      html += `<td style="padding:12px;border:1px solid #e5e7eb;text-align:center;"><button onclick="editarEstadoCliente('${feria}','${cliente}')" style="padding:6px 12px;background:#3b82f6;color:white;border:none;border-radius:4px;cursor:pointer;font-weight:500;font-size:12px;">Cambiar Estado</button></td></tr>`;
+  // Calcular totales y generar filas de datos
+  const rowsData = PPTO_ESTRUCTURA.map(row => {
+    const tipoPrefix = row.tipo === 'INGRESO' ? '1. INGRESO' : '2. GASTO';
+    const valoresPorCliente = {};
+    clientes.forEach(c => {
+      const match = allBudgets.find(b => b.feria === feria && b.cliente === c &&
+        (b.tipo === tipoPrefix || (row.tipo === 'INGRESO' && b.tipo === 'INGRESO') || (row.tipo === 'GASTO' && b.tipo === 'GASTO') || b.tipo === row.tipo) &&
+        b.categoria === row.categoria);
+      const val = match ? (parseFloat(match.importe) || 0) : 0;
+      valoresPorCliente[c] = val;
+      if (row.tipo === 'INGRESO') totalesIngreso[c] += val;
+      else totalesGasto[c] += val;
     });
-  }
+    return { ...row, valoresPorCliente };
+  });
+
+  // Generar HTML de filas
+  rowsData.forEach(row => {
+    // Separador de grupo
+    if (row.grupo !== prevGrupo) {
+      prevGrupo = row.grupo;
+      const grpColor = row.tipo === 'INGRESO' ? '#10b981' : '#ef4444';
+      const grpBg = row.tipo === 'INGRESO' ? 'rgba(16,185,129,0.12)' : 'rgba(239,68,68,0.08)';
+      html += `<tr style="background:${grpBg};">`;
+      html += `<td style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:${grpColor};font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">${row.grupo}</td>`;
+      clientes.forEach(() => { html += `<td style="border:1px solid #e5e7eb;background:${grpBg};"></td>`; });
+      html += '<td style="border:1px solid #e5e7eb;"></td>';
+      html += '</tr>';
+    }
+
+    html += `<tr style="background:${row.bg};">`;
+    const calcIcon = row.calcKey ? ` <span style="font-size:10px;color:#6b7280;cursor:pointer;" onclick="openMontajeCalculator(null)" title="Calculadora automática">🧮</span>` : '';
+    html += `<td style="padding:8px 14px 8px 24px;border:1px solid #e5e7eb;color:#374151;">${row.label}${calcIcon}</td>`;
+
+    clientes.forEach(c => {
+      const val = row.valoresPorCliente[c];
+      const inputId = `ppto_${feria}_${c}_${row.categoria}`.replace(/\s/g,'_');
+      const color = val > 0 ? (row.tipo === 'INGRESO' ? '#10b981' : '#374151') : '#9ca3af';
+      html += `<td style="padding:4px 8px;border:1px solid #e5e7eb;text-align:right;">
+        <input type="number" id="${inputId}" value="${val || ''}" placeholder="0"
+          style="width:100%;text-align:right;border:none;background:transparent;color:${color};font-size:13px;padding:4px;"
+          onchange="updatePptoCell('${feria}','${c}','${row.tipo}','${row.categoria}',this.value)"
+        /></td>`;
+    });
+    html += '<td style="border:1px solid #e5e7eb;"></td>';
+    html += '</tr>';
+  });
+
+  // Filas de totales
+  html += `<tr style="background:rgba(16,185,129,0.12);">`;
+  html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;font-weight:700;color:#10b981;">TOTAL INGRESOS</td>`;
+  clientes.forEach(c => {
+    html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#10b981;">${fmt(totalesIngreso[c])}</td>`;
+  });
+  html += '<td style="border:1px solid #e5e7eb;"></td></tr>';
+
+  html += `<tr style="background:rgba(239,68,68,0.08);">`;
+  html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;font-weight:700;color:#ef4444;">TOTAL GASTOS</td>`;
+  clientes.forEach(c => {
+    html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">${fmt(totalesGasto[c])}</td>`;
+  });
+  html += '<td style="border:1px solid #e5e7eb;"></td></tr>';
+
+  html += `<tr style="background:#fff8e1;">`;
+  html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;font-weight:700;color:#e3a017;">MARGEN</td>`;
+  clientes.forEach(c => {
+    const margen = totalesIngreso[c] - totalesGasto[c];
+    const color = margen >= 0 ? '#10b981' : '#ef4444';
+    html += `<td style="padding:10px 14px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:${color};">${fmt(margen)}</td>`;
+  });
+  html += '<td style="border:1px solid #e5e7eb;"></td></tr>';
 
   html += '</tbody></table>';
 
-  // Formulario para agregar nuevo cliente
-  html += '<div style="border:2px dashed #e5e7eb;border-radius:8px;padding:20px;background:#f9fafb;">';
-  html += '<h4 style="margin:0 0 16px 0;color:#1f2937;font-weight:600;">Agregar Cliente</h4>';
-
-  // Obtener todos los clientes existentes (para copiar)
-  const todosClientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
-
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
-
-  // Opción 1: Copiar de cliente existente
-  html += '<div>';
-  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Copiar de Cliente Existente</label>';
-  html += '<select id="copiarClienteSelect" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">';
-  html += '<option value="">-- Selecciona para copiar --</option>';
-  todosClientes.forEach(c => {
-    html += `<option value="${c}">${c}</option>`;
-  });
-  html += '</select>';
-  html += '</div>';
-
-  // Opción 2: Crear nombre nuevo
-  html += '<div>';
-  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">O Crear Cliente Nuevo</label>';
-  html += '<input id="nuevoClienteNombre" type="text" placeholder="Nombre del nuevo cliente..." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">';
-  html += '</div>';
-
-  html += '</div>';
-
-  // Estado inicial
-  html += '<div style="margin-bottom:16px;">';
-  html += '<label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Estado Inicial</label>';
-  html += '<select id="nuevoClienteEstado" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">';
-  html += '<option value="PENDIENTE_ENVIO">Pendiente de ENVIO</option>';
-  html += '<option value="ACEPTADO">Aceptado</option>';
-  html += '<option value="RECHAZADO">Rechazado</option>';
-  html += '</select>';
-  html += '</div>';
-
-  // Botón agregar
-  html += `<button onclick="agregarClienteAFeria('${feria}')" style="padding:10px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;">➕ Agregar Cliente a Feria</button>`;
-
-  html += '</div>';
+  // Sección de estados debajo de la tabla
+  if (clientes.length > 0) {
+    html += '<div style="padding:16px 16px 0;">';
+    html += '<h4 style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;margin:0 0 12px 0;">Estado del Presupuesto por Cliente</h4>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:8px;">';
+    clientes.forEach(c => {
+      const statusKey = `${feria}|${c}`;
+      const estado = pptoClienteStatus[statusKey] || 'PENDIENTE_ENVIO';
+      const estadoColors = { 'PENDIENTE_ENVIO': '#f59e0b', 'ACEPTADO': '#10b981', 'RECHAZADO': '#ef4444' };
+      const estadoLabels = { 'PENDIENTE_ENVIO': 'Pendiente de ENVIO', 'ACEPTADO': 'Aceptado', 'RECHAZADO': 'Rechazado' };
+      const col = estadoColors[estado] || '#6b7280';
+      html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;background:#f9fafb;">
+        <span style="font-weight:600;font-size:13px;">${c}</span>
+        <span style="background:${col}20;color:${col};padding:3px 8px;border-radius:4px;font-size:11px;font-weight:700;">${estadoLabels[estado]}</span>
+        <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:3px 8px;background:#e5e7eb;color:#374151;border:none;border-radius:4px;cursor:pointer;font-size:11px;">Cambiar</button>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
 
   container.innerHTML = html;
+}
+
+// Abre formulario inline para agregar cliente
+function abrirAgregarCliente(feria) {
+  const todosClientes = [...new Set(allBudgets.map(b => b.cliente).filter(Boolean))].sort();
+  const modal = document.createElement('div');
+  modal.id = 'addClienteModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+  modal.innerHTML = `
+    <div style="background:white;border-radius:8px;padding:24px;max-width:480px;width:90%;box-shadow:0 4px 20px rgba(0,0,0,0.15);">
+      <h3 style="margin:0 0 4px 0;font-size:17px;font-weight:700;">Agregar Cliente</h3>
+      <p style="margin:0 0 20px 0;color:#6b7280;font-size:13px;">Feria: <strong>${feria}</strong></p>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px;">Copiar datos de cliente existente</label>
+        <select id="copiarClienteSelect" style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
+          <option value="">— Empezar desde 0 —</option>
+          ${todosClientes.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px;">Nombre del cliente</label>
+        <input id="nuevoClienteNombre" type="text" placeholder="Nombre del cliente..." style="width:100%;padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">
+        <p style="margin:4px 0 0;font-size:11px;color:#9ca3af;">Si copias de uno existente, escribe el mismo nombre para sobrescribir o uno nuevo para duplicar.</p>
+      </div>
+      <div style="margin-bottom:20px;">
+        <label style="display:block;margin-bottom:6px;font-weight:600;font-size:13px;">Estado inicial</label>
+        <select id="nuevoClienteEstado" style="padding:8px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
+          <option value="PENDIENTE_ENVIO">Pendiente de ENVIO</option>
+          <option value="ACEPTADO">Aceptado</option>
+          <option value="RECHAZADO">Rechazado</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button onclick="document.getElementById('addClienteModal').remove()" style="padding:8px 16px;background:#e5e7eb;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+        <button onclick="confirmarAgregarCliente('${feria}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Agregar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('nuevoClienteNombre').focus();
+}
+
+function confirmarAgregarCliente(feria) {
+  const copiarDe = document.getElementById('copiarClienteSelect').value;
+  const nombre = document.getElementById('nuevoClienteNombre').value.trim();
+  const estado = document.getElementById('nuevoClienteEstado').value;
+
+  if (!nombre) { alert('Escribe el nombre del cliente'); return; }
+
+  const yaExiste = allBudgets.find(b => b.feria === feria && b.cliente === nombre);
+  if (yaExiste) { alert('Este cliente ya existe en esta feria'); return; }
+
+  if (copiarDe) {
+    // Copiar estructura de otro cliente (misma feria u otra)
+    const fuente = allBudgets.filter(b => b.cliente === copiarDe && b.feria === feria);
+    const fuenteGeneral = fuente.length ? fuente : allBudgets.filter(b => b.cliente === copiarDe);
+    fuenteGeneral.forEach(orig => {
+      allBudgets.push({ ...orig, id: 'temp_'+Date.now()+'_'+Math.random(), feria, cliente: nombre, createdAt: new Date() });
+    });
+  } else {
+    // Crear desde 0 con estructura vacía
+    allBudgets.push({ id: 'temp_'+Date.now(), year: Array.from(pptoSelYears)[0] || 2026, feria, cliente: nombre, tipo: '1. INGRESO', categoria: 'VENTAS', importe: 0, status: 'ACTIVO', createdAt: new Date() });
+  }
+
+  const statusKey = `${feria}|${nombre}`;
+  pptoClienteStatus[statusKey] = estado;
+  localStorage.setItem('pptoClienteStatus_' + statusKey, estado);
+
+  document.getElementById('addClienteModal').remove();
+  applyPptoFilters();
 }
 
 // Editar estado del cliente
@@ -2858,6 +2972,35 @@ function buildPptoMatrixTable() {
 function updatePptoMatrix(key, value) {
   pptoMatrixData[key] = parseFloat(value) || 0;
   updatePptoMatrixTotals();
+}
+
+// Actualizar celda de la nueva matriz
+async function updatePptoCell(feria, cliente, tipo, categoria, value) {
+  const importe = parseFloat(value) || 0;
+  const tipoStr = tipo === 'INGRESO' ? '1. INGRESO' : '2. GASTO';
+
+  // Buscar documento existente
+  const existing = allBudgets.find(b =>
+    b.feria === feria && b.cliente === cliente &&
+    (b.tipo === tipoStr || b.tipo === tipo) && b.categoria === categoria
+  );
+
+  try {
+    if (existing && existing.id && !existing.id.startsWith('temp_')) {
+      // Actualizar en Firestore
+      await db.collection('budgets').doc(existing.id).update({ importe });
+      existing.importe = importe;
+    } else {
+      // Crear nuevo
+      const year = Array.from(pptoSelYears)[0] || 2026;
+      const doc = { year, feria, cliente, tipo: tipoStr, categoria, descripcion: categoria, importe, status: 'ACTIVO', createdAt: new Date(), createdBy: auth.currentUser?.email || 'admin@demostra.com' };
+      const ref = await db.collection('budgets').add(doc);
+      if (existing) { existing.id = ref.id; existing.importe = importe; }
+      else { allBudgets.push({ id: ref.id, ...doc }); }
+    }
+  } catch (e) {
+    console.error('Error guardando presupuesto:', e);
+  }
 }
 
 function updatePptoMatrixTotals() {
