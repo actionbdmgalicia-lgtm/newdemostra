@@ -982,9 +982,9 @@ function fmt(v, type = 'currency') {
     const num = Math.round(v);
     const formatted = new Intl.NumberFormat('es-ES').format(num);
     return formatted + '€';
-  } else if (type === 'percent') {
+  } else if (type === 'percent' || type === '%') {
     const num = parseFloat(v) || 0;
-    return num.toFixed(1) + '%';
+    return num.toFixed(2) + '%';
   }
   return String(v);
 }
@@ -2559,7 +2559,58 @@ function renderPptoIniciales(filtered) {
   const CATS_CON_CALC = ['MONTAJE'];
   const thB = 'padding:10px 12px;border:1px solid #e5e7eb;font-weight:700;background:#f3f4f6;font-size:11px;text-transform:uppercase;letter-spacing:0.3px;';
 
-  let html = `<div style="padding:10px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;">
+  // ─ Pre-calcular totales para el gráfico ─
+  let chartIng=0, chartGasto=0;
+  budgetsFeria.filter(b=>b.cliente!=='TOTAL').forEach(b=>{
+    const imp=Math.abs(parseFloat(b.importe)||0);
+    if((b.tipo||'').includes('INGRESO')) chartIng+=imp;
+    else chartGasto+=imp;
+  });
+  const chartMargen=chartIng-chartGasto;
+  const chartPct=chartIng>0?(chartMargen/chartIng*100):0;
+
+  // ─ Donut SVG ─
+  const R=54,cx=70,cy=70,stroke=14;
+  function arc(pct,offset){
+    if(pct<=0)return'';
+    if(pct>=100)pct=99.99;
+    const r=R,circum=2*Math.PI*r;
+    const dash=circum*(pct/100);
+    const gap=circum-dash;
+    return `stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" stroke-dashoffset="${(-circum*(offset/100)).toFixed(1)}"`;
+  }
+  const gastoPct=chartIng>0?Math.min(chartGasto/chartIng*100,100):100;
+  const margenPct2=Math.max(chartPct,0);
+  const donutSvg=`<svg width="140" height="140" viewBox="0 0 140 140">
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#f3f4f6" stroke-width="${stroke}"/>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="#ef4444" stroke-width="${stroke}" ${arc(gastoPct,0)} transform="rotate(-90 ${cx} ${cy})"/>
+    <circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${chartMargen>=0?'#10b981':'#ef4444'}" stroke-width="${stroke}" ${arc(margenPct2,gastoPct)} transform="rotate(-90 ${cx} ${cy})"/>
+    <text x="${cx}" y="${cy-6}" text-anchor="middle" font-size="14" font-weight="700" fill="${chartPct>=0?'#10b981':'#ef4444'}">${chartPct.toFixed(1)}%</text>
+    <text x="${cx}" y="${cy+10}" text-anchor="middle" font-size="9" fill="#6b7280">MARGEN</text>
+  </svg>`;
+
+  let html=`<div style="padding:16px;background:#f9fafb;border-bottom:2px solid #e5e7eb;display:flex;gap:24px;align-items:center;flex-wrap:wrap;">
+    ${donutSvg}
+    <div style="display:flex;gap:16px;flex-wrap:wrap;flex:1;">
+      <div style="background:white;border-radius:10px;padding:12px 20px;border-left:4px solid #10b981;min-width:140px;">
+        <div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Ingresos Feria</div>
+        <div style="font-size:22px;font-weight:700;color:#10b981;margin-top:4px;">${fmt(chartIng)}</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:12px 20px;border-left:4px solid #ef4444;min-width:140px;">
+        <div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Gastos Feria</div>
+        <div style="font-size:22px;font-weight:700;color:#ef4444;margin-top:4px;">-${fmt(chartGasto)}</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:12px 20px;border-left:4px solid ${chartMargen>=0?'#e3a017':'#ef4444'};min-width:140px;">
+        <div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Margen</div>
+        <div style="font-size:22px;font-weight:700;color:${chartMargen>=0?'#e3a017':'#ef4444'};margin-top:4px;">${fmt(chartMargen)}</div>
+      </div>
+      <div style="background:white;border-radius:10px;padding:12px 20px;border-left:4px solid ${chartPct>=0?'#e3a017':'#ef4444'};min-width:120px;">
+        <div style="font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">% Margen</div>
+        <div style="font-size:22px;font-weight:700;color:${chartPct>=0?'#e3a017':'#ef4444'};margin-top:4px;">${chartPct.toFixed(2)}%</div>
+      </div>
+    </div>
+  </div>`;
+  html += `<div style="padding:10px 16px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #e5e7eb;flex-wrap:wrap;">
     <button onclick="pptoHideZeros=!pptoHideZeros;applyPptoFilters()"
       style="padding:5px 12px;border:1px solid ${pptoHideZeros?'#374151':'#e5e7eb'};border-radius:6px;background:${pptoHideZeros?'#374151':'white'};color:${pptoHideZeros?'white':'#6b7280'};cursor:pointer;font-size:12px;font-weight:600;">
       ${pptoHideZeros?'👁 Mostrar todos':'🚫 Ocultar items 0'}
@@ -2620,20 +2671,35 @@ function renderPptoIniciales(filtered) {
   CATS_GASTOS.forEach(cat=>{
     const catItems=[...new Set(budgetsFeria.filter(b=>b.categoria===cat||(b.tipo2||'').toUpperCase()===cat).map(b=>b.descripcion||b.detalle||cat).filter(Boolean))].sort();
     if(!catItems.length) catItems.push(cat);
-    const hasVals=catItems.some(desc=>clientes.some(c=>{
-      const m=budgetsFeria.find(b=>b.cliente===c&&(b.categoria===cat||(b.tipo2||'').toUpperCase()===cat)&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc===cat)));
-      return m&&Math.abs(parseFloat(m.importe)||0)>0;
-    }));
+    // Pre-calcular totales por cliente para esta categoría
+    const catTotals={};
+    clientes.forEach(c=>{catTotals[c]=0;});
+    catItems.forEach(desc=>{
+      clientes.forEach(c=>{
+        const m=budgetsFeria.find(b=>b.cliente===c&&(b.categoria===cat||(b.tipo2||'').toUpperCase()===cat)&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc===cat)));
+        catTotals[c]+= m?Math.abs(parseFloat(m.importe)||0):0;
+      });
+    });
+    const hasVals=clientes.some(c=>catTotals[c]>0);
     if(pptoHideZeros&&!hasVals) return;
     const isCol=pptoCollapsed.has(cat);
-    html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')"><td colspan="${clientes.length+3}" style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">${isCol?'▶':'▼'} ${cat}</td></tr>`;
-    if(!isCol){
+    const catRowTotal=clientes.reduce((s,c)=>s+catTotals[c],0);
+    if(isCol){
+      // Fila colapsada: muestra totales por cliente
+      html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')">`;
+      html+=`<td style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">▶ ${cat}</td>`;
+      clientes.forEach(c=>{
+        const v=catTotals[c];
+        html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:${v>0?'#ef4444':'#9ca3af'};font-size:12px;">${v>0?'-'+fmt(v):'—'}</td>`;
+      });
+      html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">${catRowTotal>0?'-'+fmt(catRowTotal):'—'}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+    } else {
+      html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')"><td colspan="${clientes.length+3}" style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">▼ ${cat}</td></tr>`;
       catItems.forEach(desc=>{
         const vals={};
         clientes.forEach(c=>{
           const m=budgetsFeria.find(b=>b.cliente===c&&(b.categoria===cat||(b.tipo2||'').toUpperCase()===cat)&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc===cat)));
           vals[c]=m?Math.abs(parseFloat(m.importe)||0):0;
-          totGasto[c]+=vals[c];
         });
         if(pptoHideZeros&&clientes.every(c=>!vals[c]))return;
         const rowT=clientes.reduce((s,c)=>s+vals[c],0);
@@ -2652,6 +2718,8 @@ function renderPptoIniciales(filtered) {
         html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">-${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
       });
     }
+    // Siempre sumar catTotals al total general (una sola vez, fuera del if/else)
+    clientes.forEach(c=>{totGasto[c]+=catTotals[c];});
   });
 
   // ─ TOTALES ─
