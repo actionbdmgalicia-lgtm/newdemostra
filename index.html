@@ -1030,6 +1030,7 @@ let pptoSubActual = 'iniciales';
 let pptoMatrixData = {}; // Para edición en tabla matriz
 let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
 let pptoClienteStatus = {}; // Estados de presupuestos por cliente: {feria|cliente: 'PENDIENTE_ENVIO'|'ACEPTADO'|'RECHAZADO'}
+let pptoClienteArchivado = {}; // Clientes archivados: {feria|cliente: true|false}
 let pptoHideZeros = false;
 let pptoCollapsed = new Set();
 
@@ -2506,7 +2507,7 @@ function buildPptoFilters() {
 
   if (pptoSelYears.size > 0) {
     const ferias = [...new Set(allBudgets.filter(b=>pptoSelYears.has(b.year)).map(b=>b.feria).filter(Boolean))].sort();
-    renderChips('pptoChipsFeria', [null,...ferias], f=>f||'TODAS', f=>f===null?pptoSelFerias.size===0:pptoSelFerias.has(f), f=>{if(f===null)pptoSelFerias.clear();else pptoSelFerias.has(f)?pptoSelFerias.delete(f):pptoSelFerias.add(f);buildPptoFilters();});
+    renderChips('pptoChipsFeria', ferias, f=>f, f=>pptoSelFerias.has(f), f=>{pptoSelFerias.clear();pptoSelFerias.add(f);buildPptoFilters();});
   } else {
     document.getElementById('pptoChipsFeria').innerHTML = '';
     return;
@@ -2629,11 +2630,16 @@ function renderPptoIniciales(filtered) {
   clientes.forEach(c => {
     const sk = `${feria}|${c}`;
     const est = pptoClienteStatus[sk]||'PENDIENTE_ENVIO';
+    const arch = pptoClienteArchivado?.[sk] || false;
     const EC = {PENDIENTE_ENVIO:'#f59e0b',ACEPTADO:'#10b981',RECHAZADO:'#ef4444'};
     const EL = {PENDIENTE_ENVIO:'Pendiente ENVIO',ACEPTADO:'Aceptado',RECHAZADO:'Rechazado'};
     html += `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;">
       <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}</div>
-      <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:1px 7px;background:#e5e7eb;color:#374151;border:none;border-radius:4px;cursor:pointer;font-size:10px;">Cambiar</button>
+      <div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;font-size:9px;">
+        <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:2px 5px;background:#3b82f6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Estado</button>
+        <button onclick="editarNombreCliente('${feria}','${c}')" style="padding:2px 5px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Nombre</button>
+        <button onclick="archivarCliente('${feria}','${c}',${arch})" style="padding:2px 5px;background:${arch?'#10b981':'#9ca3af'};color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">${arch?'Desarchiv':'Archiv'}</button>
+      </div>
     </td>`;
   });
   html += `<td style="border:1px solid #e5e7eb;"></td><td style="border:1px solid #e5e7eb;"></td></tr></thead><tbody>`;
@@ -3028,6 +3034,26 @@ function guardarEstadoCliente(feria, cliente) {
   applyPptoFilters();
 }
 
+function editarNombreCliente(feria, cliente) {
+  const nuevoNombre = prompt(`Editar nombre del cliente:\n\nNombre actual: ${cliente}`);
+  if (!nuevoNombre || nuevoNombre.trim() === cliente) return;
+
+  alert('✓ Función de edición de nombre próximamente\n(Por ahora: ' + nuevoNombre.trim() + ')');
+  // TODO: Implementar renombrado en Firestore
+}
+
+function archivarCliente(feria, cliente, archivado) {
+  const statusKey = `${feria}|${cliente}`;
+  const nuevoEstado = !archivado;
+  pptoClienteArchivado[statusKey] = nuevoEstado;
+
+  // Guardar en localStorage
+  localStorage.setItem('pptoClienteArchivado_' + statusKey, nuevoEstado);
+
+  // TODO: Guardar en Firestore
+  applyPptoFilters();
+}
+
 // Agregar cliente a la feria
 function agregarClienteAFeria(feria) {
   const copiarDe = document.getElementById('copiarClienteSelect').value;
@@ -3342,60 +3368,89 @@ function togglePptoMatrixZeros() {
 function renderPptoCrm(filtered) {
   const container = document.getElementById('pptoCrmContainer');
 
-  // Agrupar por estado
+  // Si no hay feria seleccionada
+  if (pptoSelFerias.size === 0) {
+    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver el seguimiento</p>';
+    return;
+  }
+
+  const feria = Array.from(pptoSelFerias)[0];
+
+  // Obtener clientes de la feria (no archivados)
+  const clientesSet = new Set();
+  allBudgets.filter(b => b.feria === feria).forEach(b => {
+    if (b.cliente && b.cliente !== 'TOTAL') {
+      const sk = `${feria}|${b.cliente}`;
+      if (!pptoClienteArchivado[sk]) clientesSet.add(b.cliente);
+    }
+  });
+  const clientes = [...clientesSet].sort();
+
+  // Agrupar clientes por estado
   const byStatus = {
-    'EN CREACION': [],
-    'ENVIADO': [],
-    'NEGOCIACION': [],
+    'PENDIENTE_ENVIO': [],
     'ACEPTADO': [],
-    'RECHAZADO': []
+    'RECHAZADO': [],
+    'ARCHIVADO': []
   };
 
-  filtered.forEach(b => {
-    const status = b.status || 'EN CREACION';
-    if (!byStatus[status]) byStatus[status] = [];
-    byStatus[status].push(b);
+  clientes.forEach(c => {
+    const sk = `${feria}|${c}`;
+    const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
+    const arch = pptoClienteArchivado[sk] || false;
+    if (arch) byStatus['ARCHIVADO'].push(c);
+    else byStatus[est].push(c);
   });
 
-  let html = '';
-  Object.entries(byStatus).forEach(([status, items]) => {
-    if (items.length === 0) return;
+  // Colores por estado
+  const statusColors = {
+    'PENDIENTE_ENVIO': { bg: '#fef3c7', border: '#f59e0b', text: '#f59e0b', label: 'Pendiente de ENVIO' },
+    'ACEPTADO': { bg: '#dcfce7', border: '#10b981', text: '#10b981', label: 'Aceptado' },
+    'RECHAZADO': { bg: '#fee2e2', border: '#ef4444', text: '#ef4444', label: 'Rechazado' },
+    'ARCHIVADO': { bg: '#f3f4f6', border: '#9ca3af', text: '#6b7280', label: 'Archivado' }
+  };
 
-    html += `<div>
-      <h3 style="font-size:13px;color:#4b5563;margin-bottom:12px;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;">${status} (${items.length})</h3>
-      <div style="display:grid;gap:12px;">`;
+  // Renderizar 4 columnas Kanban
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px;padding:16px;background:#f9fafb;border-radius:8px;">`;
 
-    items.forEach(b => {
-      const createdDate = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-      const daysAgo = Math.floor((new Date() - createdDate) / (1000 * 60 * 60 * 24));
-      const opacity = Math.min(1, 0.6 + (daysAgo / 100));
+  Object.entries(statusColors).forEach(([status, config]) => {
+    const items = byStatus[status];
+    html += `<div style="background:white;border-radius:8px;border:2px solid ${config.border};overflow:hidden;display:flex;flex-direction:column;">
+      <div style="background:${config.bg};border-bottom:2px solid ${config.border};padding:12px 16px;">
+        <h4 style="margin:0;color:${config.text};font-weight:700;font-size:14px;">${config.label}</h4>
+        <p style="margin:4px 0 0 0;color:#6b7280;font-size:12px;">${items.length} cliente${items.length !== 1 ? 's' : ''}</p>
+      </div>
+      <div style="flex:1;overflow-y:auto;padding:12px;min-height:300px;">`;
 
-      html += `<div style="padding:12px;border:1px solid #e5e7eb;border-radius:6px;opacity:${opacity};transition:opacity 0.2s;cursor:pointer;" onclick="editPptoCrmStatus(this, '${b.id}')">
-        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px;">
-          <div>
-            <p style="font-weight:600;color:#1f2937;margin-bottom:4px;">${b.cliente}</p>
-            <p style="font-size:12px;color:#6b7280;">${b.feria} (${b.year})</p>
+    if (items.length === 0) {
+      html += `<p style="color:#d1d5db;text-align:center;padding:20px 0;font-size:13px;">Sin clientes</p>`;
+    } else {
+      items.forEach(c => {
+        const sk = `${feria}|${c}`;
+        const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
+        html += `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;">
+          <p style="margin:0;font-weight:600;color:#1f2937;font-size:13px;">${c}</p>
+          <div style="display:flex;gap:4px;margin-top:8px;font-size:10px;">
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','PENDIENTE_ENVIO')" style="flex:1;padding:4px;background:${est==='PENDIENTE_ENVIO'?'#f59e0b':'#f3f4f6'};color:${est==='PENDIENTE_ENVIO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">P</button>
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','ACEPTADO')" style="flex:1;padding:4px;background:${est==='ACEPTADO'?'#10b981':'#f3f4f6'};color:${est==='ACEPTADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">A</button>
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','RECHAZADO')" style="flex:1;padding:4px;background:${est==='RECHAZADO'?'#ef4444':'#f3f4f6'};color:${est==='RECHAZADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">R</button>
           </div>
-          <span style="font-size:11px;background:#f3f4f6;padding:4px 8px;border-radius:0;color:#6b7280;">${daysAgo}d</span>
-        </div>
-        <select onchange="updatePptoCrmStatus('${b.id}', this.value)" style="width:100%;padding:6px;border:1px solid #e5e7eb;border-radius:0;background:#f8f9fa;font-size:12px;">
-          <option value="EN CREACION" ${status === 'EN CREACION' ? 'selected' : ''}>EN CREACION</option>
-          <option value="ENVIADO" ${status === 'ENVIADO' ? 'selected' : ''}>ENVIADO</option>
-          <option value="NEGOCIACION" ${status === 'NEGOCIACION' ? 'selected' : ''}>NEGOCIACION</option>
-          <option value="ACEPTADO" ${status === 'ACEPTADO' ? 'selected' : ''}>ACEPTADO</option>
-          <option value="RECHAZADO" ${status === 'RECHAZADO' ? 'selected' : ''}>RECHAZADO</option>
-        </select>
-      </div>`;
-    });
+        </div>`;
+      });
+    }
 
     html += `</div></div>`;
   });
 
-  if (html === '') {
-    html = '<p style="padding:20px;color:#6b7280;text-align:center;">No hay presupuestos en estos filtros</p>';
-  }
-
+  html += `</div>`;
   container.innerHTML = html;
+}
+
+function cambiarEstadoDesdeKanban(feria, cliente, nuevoEstado) {
+  const sk = `${feria}|${cliente}`;
+  pptoClienteStatus[sk] = nuevoEstado;
+  localStorage.setItem('pptoClienteStatus_' + sk, nuevoEstado);
+  applyPptoFilters();
 }
 
 async function updatePptoCrmStatus(budgetId, newStatus) {
