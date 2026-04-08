@@ -814,6 +814,12 @@ tr:hover { background:#f3f4f6; }
         <div class="card">
           <div class="card-header"><h2>Seguimiento de Presupuestos</h2></div>
           <div class="card-body">
+            <div style="margin-bottom:20px;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                <div><div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:6px;text-transform:uppercase;">AÑO</div><div id="pptoCrmChipsYear"></div></div>
+                <div><div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:6px;text-transform:uppercase;">FERIA</div><div id="pptoCrmChipsFeria"></div></div>
+              </div>
+            </div>
             <div id="pptoCrmContainer" style="display:grid;gap:24px;"></div>
           </div>
         </div>
@@ -1026,6 +1032,7 @@ let currentUser = null;
 let isAdmin = false;
 let allBudgets = [], pptoLoaded = false;
 let pptoSelYears = new Set(), pptoSelFerias = new Set(), pptoSelClientes = new Set();
+let pptoSelYearsCRM = new Set(), pptoSelFeriasCRM = new Set();
 let pptoSubActual = 'iniciales';
 let pptoMatrixData = {}; // Para edición en tabla matriz
 let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
@@ -3364,25 +3371,123 @@ function togglePptoMatrixZeros() {
   document.body.classList.toggle('pptoHideZeros', hideZeros);
 }
 
+function openAnadirLineaModal(feria) {
+  const modal = document.createElement('div');
+  modal.id = 'anadirLineaModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:450px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+
+  content.innerHTML = `
+    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">Agregar Nueva Línea</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Feria: <strong>${feria}</strong></p>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Nombre de la línea</label>
+      <input id="nombreLinea" type="text" placeholder="Ej: Estructuras adicionales" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;margin-bottom:8px;color:#374151;font-weight:600;font-size:14px;">Categoría</label>
+      <select id="categoriaLinea" style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;">
+        <option value="">Selecciona una categoría...</option>
+        <option value="CARPINTERIA">Carpintería</option>
+        <option value="MONTAJE">Montaje</option>
+        <option value="ALQUILER">Alquiler</option>
+        <option value="COMPRA">Compra</option>
+        <option value="MATERIAL">Material</option>
+        <option value="TRANSPORTE">Transporte</option>
+        <option value="GASTOS VIAJE">Gastos Viaje</option>
+        <option value="GRAFICA">Gráfica</option>
+        <option value="ELECTRICIDAD">Electricidad</option>
+        <option value="SERVICIOS FERIALES">Servicios Feriales</option>
+        <option value="OTROS">Otros</option>
+      </select>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('anadirLineaModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+      <button onclick="guardarLineaNueva('${feria}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Agregar Línea</button>
+    </div>
+  `;
+
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
+function guardarLineaNueva(feria) {
+  const nombre = document.getElementById('nombreLinea').value.trim();
+  const categoria = document.getElementById('categoriaLinea').value;
+
+  if (!nombre || !categoria) {
+    alert('Por favor completa todos los campos');
+    return;
+  }
+
+  alert('✓ Línea agregada: ' + nombre + ' (' + categoria + ')\n\nFunción de persistencia próximamente');
+  document.getElementById('anadirLineaModal').remove();
+  // TODO: Guardar en Firestore y refrescar tabla
+}
+
+function eliminarLinea(feria, categoria, cliente) {
+  // Verificar que todas las celdas de esta línea estén en 0
+  const inputs = document.querySelectorAll(`input[id*="${categoria}"]`);
+  let todoCero = true;
+  inputs.forEach(input => {
+    if (parseFloat(input.value) !== 0) todoCero = false;
+  });
+
+  if (!todoCero) {
+    alert('❌ La línea debe estar toda a cero antes de eliminar');
+    return;
+  }
+
+  if (confirm('¿Eliminar esta línea?')) {
+    alert('✓ Línea eliminada\n\nFunción de persistencia próximamente');
+    // TODO: Eliminar de Firestore y refrescar tabla
+  }
+}
+
 // ── SEGUIMIENTO (CRM) ──
 function renderPptoCrm(filtered) {
   const container = document.getElementById('pptoCrmContainer');
 
-  // Si no hay feria seleccionada
-  if (pptoSelFerias.size === 0) {
-    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba para ver el seguimiento</p>';
+  // Renderizar filtros de AÑO
+  const years = [...new Set(allBudgets.map(b=>b.year).filter(Boolean))].sort();
+  renderChips('pptoCrmChipsYear', years, y=>String(y), y=>pptoSelYearsCRM.has(y), y=>{
+    if(pptoSelYearsCRM.has(y)) pptoSelYearsCRM.delete(y);
+    else pptoSelYearsCRM.clear(), pptoSelYearsCRM.add(y);
+    pptoSelFeriasCRM.clear();
+    renderPptoCrm(filtered);
+  });
+
+  // Si no hay año seleccionado
+  if(pptoSelYearsCRM.size===0){
+    container.innerHTML='<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona un Año arriba</p>';
     return;
   }
 
-  const feria = Array.from(pptoSelFerias)[0];
+  // Renderizar filtros de FERIA
+  const ferias = [...new Set(allBudgets.filter(b=>pptoSelYearsCRM.has(b.year)).map(b=>b.feria).filter(Boolean))].sort();
+  renderChips('pptoCrmChipsFeria', ferias, f=>f, f=>pptoSelFeriasCRM.has(f), f=>{
+    if(pptoSelFeriasCRM.has(f)) pptoSelFeriasCRM.delete(f);
+    else pptoSelFeriasCRM.clear(), pptoSelFeriasCRM.add(f);
+    renderPptoCrm(filtered);
+  });
 
-  // Obtener clientes de la feria (no archivados)
+  // Si no hay feria seleccionada
+  if (pptoSelFeriasCRM.size === 0) {
+    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba</p>';
+    return;
+  }
+
+  const feria = Array.from(pptoSelFeriasCRM)[0];
+
+  // Obtener TODOS los clientes (incluyendo archivados para mostrar en columna ARCHIVADO)
   const clientesSet = new Set();
   allBudgets.filter(b => b.feria === feria).forEach(b => {
-    if (b.cliente && b.cliente !== 'TOTAL') {
-      const sk = `${feria}|${b.cliente}`;
-      if (!pptoClienteArchivado[sk]) clientesSet.add(b.cliente);
-    }
+    if (b.cliente && b.cliente !== 'TOTAL') clientesSet.add(b.cliente);
   });
   const clientes = [...clientesSet].sort();
 
@@ -3396,10 +3501,13 @@ function renderPptoCrm(filtered) {
 
   clientes.forEach(c => {
     const sk = `${feria}|${c}`;
-    const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
     const arch = pptoClienteArchivado[sk] || false;
-    if (arch) byStatus['ARCHIVADO'].push(c);
-    else byStatus[est].push(c);
+    if (arch) {
+      byStatus['ARCHIVADO'].push(c);
+    } else {
+      const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
+      byStatus[est].push(c);
+    }
   });
 
   // Colores por estado
@@ -3428,12 +3536,18 @@ function renderPptoCrm(filtered) {
       items.forEach(c => {
         const sk = `${feria}|${c}`;
         const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
-        html += `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s;">
+        const arch = pptoClienteArchivado[sk] || false;
+        const btnClass = status === 'ARCHIVADO' ? 'Desarchiv' : 'Arch';
+
+        html += `<div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:12px;margin-bottom:8px;">
           <p style="margin:0;font-weight:600;color:#1f2937;font-size:13px;">${c}</p>
-          <div style="display:flex;gap:4px;margin-top:8px;font-size:10px;">
-            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','PENDIENTE_ENVIO')" style="flex:1;padding:4px;background:${est==='PENDIENTE_ENVIO'?'#f59e0b':'#f3f4f6'};color:${est==='PENDIENTE_ENVIO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">P</button>
-            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','ACEPTADO')" style="flex:1;padding:4px;background:${est==='ACEPTADO'?'#10b981':'#f3f4f6'};color:${est==='ACEPTADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">A</button>
-            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','RECHAZADO')" style="flex:1;padding:4px;background:${est==='RECHAZADO'?'#ef4444':'#f3f4f6'};color:${est==='RECHAZADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">R</button>
+          <div style="display:flex;gap:4px;margin-top:8px;font-size:9px;flex-wrap:wrap;">
+            ${status !== 'ARCHIVADO' ? `
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','PENDIENTE_ENVIO')" style="flex:1;min-width:40px;padding:4px 2px;background:${est==='PENDIENTE_ENVIO'?'#f59e0b':'#f3f4f6'};color:${est==='PENDIENTE_ENVIO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">P</button>
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','ACEPTADO')" style="flex:1;min-width:40px;padding:4px 2px;background:${est==='ACEPTADO'?'#10b981':'#f3f4f6'};color:${est==='ACEPTADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">A</button>
+            <button onclick="cambiarEstadoDesdeKanban('${feria}','${c}','RECHAZADO')" style="flex:1;min-width:40px;padding:4px 2px;background:${est==='RECHAZADO'?'#ef4444':'#f3f4f6'};color:${est==='RECHAZADO'?'white':'#6b7280'};border:none;border-radius:3px;cursor:pointer;font-weight:600;">R</button>
+            ` : ''}
+            <button onclick="archivarCliente('${feria}','${c}',${arch})" style="flex:1;min-width:60px;padding:4px 2px;background:${arch?'#10b981':'#9ca3af'};color:white;border:none;border-radius:3px;cursor:pointer;font-weight:600;font-size:8px;">${btnClass}</button>
           </div>
         </div>`;
       });
