@@ -779,6 +779,7 @@ tr:hover { background:#f3f4f6; }
       <div class="sub-tabs">
         <button class="sub-tab-btn active" onclick="switchPptoSub('iniciales')">Presupuestos Iniciales</button>
         <button class="sub-tab-btn" onclick="switchPptoSub('crm')">Seguimiento</button>
+        <button class="sub-tab-btn" onclick="switchPptoSub('lanzamiento')">Presupuestos Lanzamiento</button>
         <button class="sub-tab-btn" onclick="switchPptoSub('avance')">Avance vs Real</button>
       </div>
 
@@ -825,7 +826,26 @@ tr:hover { background:#f3f4f6; }
         </div>
       </div>
 
-      <!-- SUB 3: AVANCE vs REAL -->
+      <!-- SUB 3: PRESUPUESTOS DE LANZAMIENTO (Objetivos %) -->
+      <div id="ppto-sub-lanzamiento" class="sub-tab-content" style="display:none;">
+        <div class="card">
+          <div class="card-header"><h2>Presupuestos de Lanzamiento (Objetivos %)</h2></div>
+          <div class="card-body">
+            <div style="margin-bottom:20px;padding:12px;background:#e0f2fe;border-radius:6px;border-left:4px solid #0284c7;">
+              <p style="margin:0;color:#0c4a6e;font-size:13px;"><strong>📌 Objetivo de mejora por línea:</strong> 100% = base, 80% = reducción 20%, 110% = aumento 10%</p>
+            </div>
+            <div style="margin-bottom:20px;">
+              <div style="display:flex;gap:16px;flex-wrap:wrap;">
+                <div><div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:6px;text-transform:uppercase;">AÑO</div><div id="pptoLanzChipsYear"></div></div>
+                <div><div style="font-size:11px;color:#6b7280;font-weight:600;margin-bottom:6px;text-transform:uppercase;">FERIA</div><div id="pptoLanzChipsFeria"></div></div>
+              </div>
+            </div>
+            <div id="pptoLanzContainer" style="border:1px solid #e5e7eb;border-radius:6px;overflow-x:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUB 4: AVANCE vs REAL -->
       <div id="ppto-sub-avance" class="sub-tab-content" style="display:none;">
         <div class="stats">
           <div class="stat"><div class="label">Ingresos Ppto</div><div class="value" id="pptoIngPpto">—</div></div>
@@ -1033,6 +1053,8 @@ let isAdmin = false;
 let allBudgets = [], pptoLoaded = false;
 let pptoSelYears = new Set(), pptoSelFerias = new Set(), pptoSelClientes = new Set();
 let pptoSelYearsCRM = new Set(), pptoSelFeriasCRM = new Set();
+let pptoSelYearsLanz = new Set(), pptoSelFeriasLanz = new Set();
+let pptoObjetivos = {}; // Objetivos % por línea: {feria|categoria: 100}
 let pptoSubActual = 'iniciales';
 let pptoMatrixData = {}; // Para edición en tabla matriz
 let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
@@ -2531,6 +2553,7 @@ function applyPptoFilters() {
 
   if (pptoSubActual === 'iniciales') renderPptoIniciales(filtered);
   else if (pptoSubActual === 'crm') renderPptoCrm(filtered);
+  else if (pptoSubActual === 'lanzamiento') renderPptoLanzamiento(filtered);
   else if (pptoSubActual === 'avance') renderPptoAvance(filtered);
 }
 
@@ -3565,6 +3588,90 @@ function cambiarEstadoDesdeKanban(feria, cliente, nuevoEstado) {
   pptoClienteStatus[sk] = nuevoEstado;
   localStorage.setItem('pptoClienteStatus_' + sk, nuevoEstado);
   applyPptoFilters();
+}
+
+// ── PRESUPUESTOS DE LANZAMIENTO (Objetivos %) ──
+function renderPptoLanzamiento(filtered) {
+  const container = document.getElementById('pptoLanzContainer');
+
+  // Renderizar filtros de AÑO
+  const years = [...new Set(allBudgets.map(b=>b.year).filter(Boolean))].sort();
+  renderChips('pptoLanzChipsYear', years, y=>String(y), y=>pptoSelYearsLanz.has(y), y=>{
+    if(pptoSelYearsLanz.has(y)) pptoSelYearsLanz.delete(y);
+    else pptoSelYearsLanz.clear(), pptoSelYearsLanz.add(y);
+    pptoSelFeriasLanz.clear();
+    renderPptoLanzamiento(filtered);
+  });
+
+  if(pptoSelYearsLanz.size===0){
+    container.innerHTML='<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona un Año arriba</p>';
+    return;
+  }
+
+  // Renderizar filtros de FERIA
+  const ferias = [...new Set(allBudgets.filter(b=>pptoSelYearsLanz.has(b.year)).map(b=>b.feria).filter(Boolean))].sort();
+  renderChips('pptoLanzChipsFeria', ferias, f=>f, f=>pptoSelFeriasLanz.has(f), f=>{
+    if(pptoSelFeriasLanz.has(f)) pptoSelFeriasLanz.delete(f);
+    else pptoSelFeriasLanz.clear(), pptoSelFeriasLanz.add(f);
+    renderPptoLanzamiento(filtered);
+  });
+
+  if (pptoSelFeriasLanz.size === 0) {
+    container.innerHTML = '<p style="padding:32px;color:#6b7280;text-align:center;">Selecciona una Feria arriba</p>';
+    return;
+  }
+
+  const feria = Array.from(pptoSelFeriasLanz)[0];
+  const budgetsFeria = allBudgets.filter(b => b.feria === feria);
+
+  // Obtener categorías únicas
+  const catSet = new Set();
+  budgetsFeria.forEach(b => {
+    if (b.categoria) catSet.add(b.categoria);
+  });
+  const categorias = [...catSet].sort();
+
+  // Renderizar tabla de objetivos
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:#f3f4f6;"><th style="padding:12px;text-align:left;border:1px solid #e5e7eb;font-weight:600;min-width:200px;">Categoría / Línea</th><th style="padding:12px;text-align:center;border:1px solid #e5e7eb;font-weight:600;min-width:120px;">% Objetivo</th></tr></thead>';
+  html += '<tbody>';
+
+  categorias.forEach(cat => {
+    const sk = `${feria}|${cat}`;
+    const obj = pptoObjetivos[sk] || 100;
+
+    html += `<tr style="background:rgba(0,0,0,0.02);">`;
+    html += `<td style="padding:12px;border:1px solid #e5e7eb;font-weight:600;color:#1f2937;">${cat}</td>`;
+    html += `<td style="padding:12px;border:1px solid #e5e7eb;text-align:center;">
+      <input type="number" id="obj_${sk.replace(/\|/g,'_')}" value="${obj}" min="0" max="200"
+        style="width:80px;padding:6px;border:1px solid #e5e7eb;border-radius:4px;text-align:center;font-weight:600;" />
+      <span style="margin-left:8px;color:#6b7280;font-size:12px;">%</span>
+    </td>`;
+    html += `</tr>`;
+  });
+
+  html += '</tbody></table>';
+  html += `<div style="margin-top:16px;display:flex;gap:8px;">
+    <button onclick="guardarObjetivosLanzamiento('${feria}')" style="padding:10px 20px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">💾 Guardar Objetivos</button>
+  </div>`;
+
+  container.innerHTML = html;
+}
+
+function guardarObjetivosLanzamiento(feria) {
+  const inputs = document.querySelectorAll('input[id^="obj_"]');
+  let cambios = 0;
+
+  inputs.forEach(input => {
+    const sk = input.id.replace('obj_', '').replace(/_/g, '|');
+    const valor = parseFloat(input.value) || 100;
+    pptoObjetivos[sk] = valor;
+    localStorage.setItem('pptoObjetivos_' + sk, valor);
+    cambios++;
+  });
+
+  alert(`✓ ${cambios} objetivo(s) guardado(s)\n\nSincronización Firestore próximamente`);
+  // TODO: Guardar en Firestore
 }
 
 async function updatePptoCrmStatus(budgetId, newStatus) {
