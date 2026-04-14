@@ -634,6 +634,10 @@ tr:hover { background:#f3f4f6; }
       <span class="material-symbols-outlined icon">security</span>
       Admin
     </button>
+    <button class="nav-item" onclick="switchPage('ayuda')" style="margin-top:16px;border-top:1px solid #e5e7eb;padding-top:16px;">
+      <span class="material-symbols-outlined icon">help_outline</span>
+      Ayuda
+    </button>
   </nav>
 </aside>
 
@@ -894,6 +898,116 @@ tr:hover { background:#f3f4f6; }
       </div>
     </div>
 
+    <!-- AYUDA PAGE -->
+    <div id="ayuda-page" class="page-section" style="display:none;">
+      <h2 style="font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:24px;color:#1f2937;">Centro de Ayuda</h2>
+
+      <div class="card">
+        <div class="card-header"><h2>📊 Dashboard</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;"><strong>¿Qué es?</strong> Panel principal que muestra un resumen visual de tus ferias y presupuestos.</p>
+          <p><strong>Cómo usar:</strong> El dashboard muestra tarjetas resumen con datos clave. Desde aquí puedes acceder rápidamente a todas las secciones usando el menú lateral.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><h2>📈 Visualización</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;"><strong>¿Qué es?</strong> Permite visualizar datos de manera gráfica con filtros y desglose detallado.</p>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Filtros:</strong> Filtra por Año y Feria usando los chips en la parte superior</li>
+            <li><strong>Agrupación:</strong> Los datos se organizan por categorías (Carpintería, Montaje, etc.)</li>
+            <li><strong>Expandir/Contraer:</strong> Haz clic en una categoría para ver más detalles</li>
+            <li><strong>Gráfico de Pastel:</strong> Muestra la distribución visual de costos por categoría</li>
+            <li><strong>Desglose Detallado:</strong> Expande cualquier categoría para ver líneas individuales</li>
+          </ul>
+          <p><strong>Consejo:</strong> Usa los filtros para analizar ferias específicas rápidamente.</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><h2>📥 Carga de Datos</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;"><strong>¿Qué es?</strong> Sección para registrar nuevos costos y movimientos.</p>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Filtros:</strong> Selecciona Año, Feria y Cliente</li>
+            <li><strong>Formulario:</strong> Completa los datos del movimiento (tipo, categoría, descripción, importe)</li>
+            <li><strong>Guardar:</strong> Haz clic en "Guardar Movimiento" para registrar los datos</li>
+          </ul>
+          <p><strong>Categorías disponibles:</strong> Carpintería, Montaje, Alquiler, Compra, Material, Transporte, Gastos Viaje, Gráfica, Electricidad, Servicios Feriales, Otros</p>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><h2>💰 Presupuestos</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;"><strong>¿Qué es?</strong> Gestión completa de presupuestos con 4 vistas diferentes.</p>
+
+          <h3 style="margin:20px 0 12px;font-weight:700;color:#1f2937;font-size:15px;">1️⃣ Presupuestos Iniciales</h3>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Tabla Matriz:</strong> Filas = Conceptos, Columnas = Clientes</li>
+            <li><strong>Filtros:</strong> Filtra por Año y Feria para ver presupuestos específicos</li>
+            <li><strong>Agregar Cliente:</strong> Haz clic en el botón "+" en la esquina superior derecha</li>
+            <li><strong>Agregar Línea:</strong> Usa el botón "➕ Agregar Línea" para crear nuevas categorías de gasto</li>
+            <li><strong>Eliminar Línea:</strong> Haz clic en el botón "✕" al lado de una categoría (solo si está con valores 0)</li>
+            <li><strong>Editar Valores:</strong> Haz clic en cualquier celda para editar el importe</li>
+            <li><strong>Gestionar Clientes:</strong> Usa los botones "Estado", "Nombre", "Archiv" bajo cada cliente para gestionar su estado</li>
+            <li><strong>Gráfico Margen:</strong> Muestra visualmente el margen por feria</li>
+          </ul>
+
+          <h3 style="margin:20px 0 12px;font-weight:700;color:#1f2937;font-size:15px;">2️⃣ Seguimiento (CRM)</h3>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Vista Kanban:</strong> Organiza presupuestos en 4 columnas: Pendiente ENVIO, Aceptado, Rechazado, Archivado</li>
+            <li><strong>Filtros:</strong> Filtra por Año y Feria</li>
+            <li><strong>Cambiar Estado:</strong> Haz clic en los botones de las tarjetas para mover presupuestos entre estados</li>
+            <li><strong>Detalles:</strong> Expande cualquier tarjeta para ver el desglose de costos</li>
+          </ul>
+
+          <h3 style="margin:20px 0 12px;font-weight:700;color:#1f2937;font-size:15px;">3️⃣ Presupuestos Lanzamiento</h3>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Objetivos %:</strong> Define metas de mejora por categoría</li>
+            <li><strong>Escala:</strong> 100% = base actual, 80% = reducción 20%, 110% = aumento 10%</li>
+            <li><strong>Guardar Cambios:</strong> Los objetivos se guardan automáticamente</li>
+            <li><strong>Lanzar:</strong> Una vez definidos los objetivos, lanza el presupuesto</li>
+            <li><strong>Bloqueo:</strong> Después de lanzar, el presupuesto inicial queda bloqueado</li>
+            <li><strong>Desbloquear:</strong> Para desbloquear, escribe "DESBLOQUEAR" en el campo que aparece</li>
+          </ul>
+
+          <h3 style="margin:20px 0 12px;font-weight:700;color:#1f2937;font-size:15px;">4️⃣ Avance vs Real</h3>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Comparación:</strong> Compara presupuestado vs realizado</li>
+            <li><strong>Ingresos/Gastos:</strong> Muestra ambas líneas de forma clara</li>
+            <li><strong>Detalles:</strong> Expande para ver el desglose por categoría</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <div class="card-header"><h2>👤 Panel Administrativo</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;"><strong>¿Qué es?</strong> Sección restringida a administradores para gestionar usuarios.</p>
+          <ul style="margin-left:20px;margin-bottom:16px;">
+            <li><strong>Crear Usuario:</strong> Rellena email, contraseña y rol, luego haz clic en "Crear Usuario"</li>
+            <li><strong>Roles:</strong> Usuario (básico), Editor (puede modificar datos), Admin (acceso total)</li>
+            <li><strong>Eliminar Usuario:</strong> Usa el botón "Eliminar" en la tabla de usuarios registrados</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:24px;background:rgba(227,160,23,0.08);border-left:4px solid #e3a017;">
+        <div class="card-header"><h2>💡 Consejos Generales</h2></div>
+        <div class="card-body">
+          <ul style="margin-left:20px;">
+            <li><strong>Filtros:</strong> Los chips de filtro funcionan en toda la aplicación. Haz clic para seleccionar/deseleccionar</li>
+            <li><strong>Expandir/Contraer:</strong> Haz clic en las filas con ▶ o ▼ para expandir o contraer grupos</li>
+            <li><strong>Ocultar Ceros:</strong> En Presupuestos Iniciales, usa el botón para ocultar líneas con valor 0</li>
+            <li><strong>Estado de Presupuestos:</strong> El estado se sincroniza automáticamente entre pestañas</li>
+            <li><strong>Guardar Cambios:</strong> Los cambios se guardan automáticamente en la base de datos</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /pageContent -->
 </div><!-- /main -->
 
@@ -1005,8 +1119,12 @@ tr:hover { background:#f3f4f6; }
 // ── FORMATTING ────────────────────────────────────────────
 function fmt(v, type = 'currency') {
   if (type === 'currency') {
-    const num = Math.round(v);
-    const formatted = new Intl.NumberFormat('es-ES').format(num);
+    const num = parseFloat(v) || 0;
+    const hasDecimals = num % 1 !== 0;
+    const formatted = new Intl.NumberFormat('es-ES', {
+      minimumFractionDigits: hasDecimals ? 2 : 0,
+      maximumFractionDigits: 2
+    }).format(num);
     return formatted + '€';
   } else if (type === 'percent' || type === '%') {
     const num = parseFloat(v) || 0;
@@ -1060,8 +1178,11 @@ let pptoMatrixData = {}; // Para edición en tabla matriz
 let pptoMatrixClienteSelected = ''; // Cliente seleccionado en matriz
 let pptoClienteStatus = {}; // Estados de presupuestos por cliente: {feria|cliente: 'PENDIENTE_ENVIO'|'ACEPTADO'|'RECHAZADO'}
 let pptoClienteArchivado = {}; // Clientes archivados: {feria|cliente: true|false}
+let pptoClienteLanzado = {}; // Presupuestos lanzados (bloqueados): {feria|cliente: true|false}
 let pptoHideZeros = false;
 let pptoCollapsed = new Set();
+let pptoCollapseIngresos = false;
+let pptoCollapseGastos = false;
 
 function switchPage(page) {
   document.querySelectorAll('.page-section').forEach(el => el.classList.remove('active'));
@@ -1076,7 +1197,7 @@ function switchPage(page) {
 
 function switchPptoSub(sub) {
   pptoSubActual = sub;
-  ['iniciales','crm','avance'].forEach(s => {
+  ['iniciales','crm','lanzamiento','avance'].forEach(s => {
     const el = document.getElementById('ppto-sub-' + s);
     if(el) {
       if (s === sub) el.style.display = 'block';
@@ -1085,6 +1206,7 @@ function switchPptoSub(sub) {
     const btn = document.querySelector(`[onclick="switchPptoSub('${s}')"]`);
     if(btn) btn.classList.toggle('active', s === sub);
   });
+  if (sub === 'lanzamiento') renderPptoLanzamiento([]);
   applyPptoFilters();
 }
 
@@ -1221,6 +1343,10 @@ async function init() {
     if (key.startsWith('pptoClienteStatus_')) {
       const statusKey = key.replace('pptoClienteStatus_', '');
       pptoClienteStatus[statusKey] = localStorage.getItem(key);
+    }
+    if (key.startsWith('pptoClienteLanzado_')) {
+      const lanzKey = key.replace('pptoClienteLanzado_', '');
+      pptoClienteLanzado[lanzKey] = localStorage.getItem(key) === 'true';
     }
   }
 
@@ -2646,6 +2772,14 @@ function renderPptoIniciales(filtered) {
       style="padding:5px 12px;border:1px solid ${pptoHideZeros?'#374151':'#e5e7eb'};border-radius:6px;background:${pptoHideZeros?'#374151':'white'};color:${pptoHideZeros?'white':'#6b7280'};cursor:pointer;font-size:12px;font-weight:600;">
       ${pptoHideZeros?'👁 Mostrar todos':'🚫 Ocultar items 0'}
     </button>
+    <button onclick="openAnadirLineaModal('${feria}')"
+      style="padding:5px 12px;border:1px solid #e5e7eb;border-radius:6px;background:white;color:#10b981;cursor:pointer;font-size:12px;font-weight:600;border-color:#10b981;">
+      ➕ Agregar Línea
+    </button>
+    <button onclick="openLanzarPresupuestoModal()"
+      style="padding:5px 12px;border:1px solid #e5e7eb;border-radius:6px;background:white;color:#e3a017;cursor:pointer;font-size:12px;font-weight:600;border-color:#e3a017;">
+      🚀 Lanzar
+    </button>
     <span style="color:#9ca3af;font-size:12px;">${clientes.length} clientes · ${budgetsFeria.length} líneas</span>
   </div><div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">`;
 
@@ -2661,14 +2795,16 @@ function renderPptoIniciales(filtered) {
     const sk = `${feria}|${c}`;
     const est = pptoClienteStatus[sk]||'PENDIENTE_ENVIO';
     const arch = pptoClienteArchivado?.[sk] || false;
+    const lanzado = pptoClienteLanzado?.[sk] || false;
     const EC = {PENDIENTE_ENVIO:'#f59e0b',ACEPTADO:'#10b981',RECHAZADO:'#ef4444'};
     const EL = {PENDIENTE_ENVIO:'Pendiente ENVIO',ACEPTADO:'Aceptado',RECHAZADO:'Rechazado'};
     html += `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;">
-      <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}</div>
+      <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}${lanzado?' 🔒':''}​</div>
       <div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;font-size:9px;">
         <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:2px 5px;background:#3b82f6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Estado</button>
         <button onclick="editarNombreCliente('${feria}','${c}')" style="padding:2px 5px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Nombre</button>
         <button onclick="archivarCliente('${feria}','${c}',${arch})" style="padding:2px 5px;background:${arch?'#10b981':'#9ca3af'};color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">${arch?'Desarchiv':'Archiv'}</button>
+        ${lanzado?`<button onclick="abrirDesbloquearModal('${feria}','${c}')" style="padding:2px 5px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">🔓 Desbl</button>`:''​}
       </div>
     </td>`;
   });
@@ -2677,33 +2813,45 @@ function renderPptoIniciales(filtered) {
   const totIng={}, totGasto={};
   clientes.forEach(c=>{totIng[c]=0;totGasto[c]=0;});
 
-  // ─ INGRESOS ─
-  html += `<tr style="background:rgba(16,185,129,0.12);"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#10b981;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">▼ INGRESOS</td></tr>`;
-  let ingItems = [...new Set(budgetsFeria.filter(b=>b.tipo&&(b.tipo.includes('INGRESO'))).map(b=>b.descripcion||b.detalle||'Ventas').filter(Boolean))].sort();
-  if (!ingItems.length) ingItems=['Ventas'];
-  ingItems.forEach(desc=>{
-    const vals={};
-    clientes.forEach(c=>{
-      const m=budgetsFeria.find(b=>b.cliente===c&&(b.tipo||'').includes('INGRESO')&&(b.descripcion===desc||b.detalle===desc||(!b.descripcion&&!b.detalle&&desc==='Ventas')));
-      vals[c]=m?Math.abs(parseFloat(m.importe)||0):0;
-      totIng[c]+=vals[c];
-    });
-    if(pptoHideZeros&&clientes.every(c=>!vals[c]))return;
-    const rowT=clientes.reduce((s,c)=>s+vals[c],0);
-    html+=`<tr style="background:rgba(16,185,129,0.03);" onmouseover="this.style.background='rgba(16,185,129,0.08)'" onmouseout="this.style.background='rgba(16,185,129,0.03)'">`;
-    html+=`<td style="padding:6px 14px 6px 28px;border:1px solid #e5e7eb;color:#374151;position:sticky;left:0;background:rgba(16,185,129,0.03);">${desc}</td>`;
-    clientes.forEach(c=>{
-      const v=vals[c]; const eid=`pi_${feria}_${c}_${desc}`.replace(/[^a-z0-9]/gi,'_');
-      html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0"
-        style="width:90px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#10b981;font-size:13px;background:transparent;"
-        onfocus="this.style.borderColor='#10b981';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'"
-        onchange="updatePptoCelda('${feria}','${c}','INGRESO','VENTAS','${desc.replace(/'/g,"\\'")}',this.value)"/></td>`;
-    });
-    html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#10b981;">${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
-  });
+  // ─ INGRESOS (Colapsable) ─
+  html += `<tr style="background:rgba(16,185,129,0.12);cursor:pointer;" onclick="pptoCollapseIngresos=!pptoCollapseIngresos;applyPptoFilters()"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#10b981;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;user-select:none;">${pptoCollapseIngresos?'▶':'▼'} INGRESOS</td></tr>`;
 
-  // ─ GASTOS por categoría ─
-  html+=`<tr style="background:rgba(239,68,68,0.08);"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#ef4444;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;">▼ GASTOS</td></tr>`;
+  if(!pptoCollapseIngresos){
+    let ingItems = [...new Set(budgetsFeria.filter(b=>b.tipo&&(b.tipo.includes('INGRESO'))).map(b=>b.descripcion||b.detalle).filter(Boolean))].sort();
+    ingItems.forEach(desc=>{
+      const vals={};
+      clientes.forEach(c=>{
+        const m=budgetsFeria.find(b=>b.cliente===c&&(b.tipo||'').includes('INGRESO')&&(b.descripcion===desc||b.detalle===desc));
+        vals[c]=m?Math.abs(parseFloat(m.importe)||0):0;
+        totIng[c]+=vals[c];
+      });
+      if(pptoHideZeros&&clientes.every(c=>!vals[c]))return;
+      const rowT=clientes.reduce((s,c)=>s+vals[c],0);
+      html+=`<tr style="background:rgba(16,185,129,0.03);" onmouseover="this.style.background='rgba(16,185,129,0.08)'" onmouseout="this.style.background='rgba(16,185,129,0.03)'">`;
+      html+=`<td style="padding:6px 14px 6px 28px;border:1px solid #e5e7eb;color:#374151;position:sticky;left:0;background:rgba(16,185,129,0.03);">${desc}</td>`;
+      clientes.forEach(c=>{
+        const v=vals[c]; const eid=`pi_${feria}_${c}_${desc}`.replace(/[^a-z0-9]/gi,'_');
+        const sk = `${feria}|${c}`;
+        const lanzado = pptoClienteLanzado?.[sk] || false;
+        html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0" ${lanzado?'disabled':''}
+          style="width:90px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#10b981;font-size:13px;background:${lanzado?'#f3f4f6':'transparent'};opacity:${lanzado?'0.6':'1'};cursor:${lanzado?'not-allowed':'text'};"
+          onfocus="if(!this.disabled)this.style.borderColor='#10b981';if(!this.disabled)this.style.background='white'" onblur="if(!this.disabled)this.style.borderColor='transparent';if(!this.disabled)this.style.background='transparent'"
+          onchange="updatePptoCelda('${feria}','${c}','INGRESO','VENTAS','${desc.replace(/'/g,"\\'")}',this.value)"/></td>`;
+      });
+      html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#10b981;">${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+    });
+  } else {
+    // Si INGRESOS está colapsado, aún así calcular totales
+    budgetsFeria.filter(b=>b.tipo&&(b.tipo.includes('INGRESO'))).forEach(b=>{
+      const c=b.cliente;
+      if(totIng[c]!==undefined) totIng[c]+=Math.abs(parseFloat(b.importe)||0);
+    });
+  }
+
+  // ─ GASTOS por categoría (Colapsable) ─
+  html+=`<tr style="background:rgba(239,68,68,0.08);cursor:pointer;" onclick="pptoCollapseGastos=!pptoCollapseGastos;applyPptoFilters()"><td colspan="${clientes.length+3}" style="padding:8px 14px;border:1px solid #e5e7eb;font-weight:700;color:#ef4444;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;user-select:none;">${pptoCollapseGastos?'▶':'▼'} GASTOS</td></tr>`;
+
+  if(!pptoCollapseGastos){
   CATS_GASTOS.forEach(cat=>{
     const catItems=[...new Set(budgetsFeria.filter(b=>b.categoria===cat||(b.tipo2||'').toUpperCase()===cat).map(b=>b.descripcion||b.detalle||cat).filter(Boolean))].sort();
     if(!catItems.length) catItems.push(cat);
@@ -2728,9 +2876,9 @@ function renderPptoIniciales(filtered) {
         const v=catTotals[c];
         html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:600;color:${v>0?'#ef4444':'#9ca3af'};font-size:12px;">${v>0?'-'+fmt(v):'—'}</td>`;
       });
-      html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">${catRowTotal>0?'-'+fmt(catRowTotal):'—'}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
+      html+=`<td style="padding:7px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">${catRowTotal>0?'-'+fmt(catRowTotal):'—'}</td><td style="border:1px solid #e5e7eb;padding:4px;text-align:center;"><button onclick="event.stopPropagation();eliminarLinea('${feria}','${cat}')" title="Eliminar línea" style="background:#ef4444;color:white;border:none;border-radius:3px;padding:3px 6px;font-size:10px;cursor:pointer;font-weight:600;">✕</button></td></tr>`;
     } else {
-      html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')"><td colspan="${clientes.length+3}" style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">▼ ${cat}</td></tr>`;
+      html+=`<tr style="background:#f3f4f6;cursor:pointer;" onclick="togglePpoCategoria('${cat}')"><td colspan="${clientes.length+2}" style="padding:7px 14px 7px 18px;border:1px solid #e5e7eb;font-weight:600;color:#ef4444;font-size:12px;user-select:none;">▼ ${cat}</td><td style="border:1px solid #e5e7eb;padding:4px;text-align:center;"><button onclick="event.stopPropagation();eliminarLinea('${feria}','${cat}')" title="Eliminar línea" style="background:#ef4444;color:white;border:none;border-radius:3px;padding:3px 6px;font-size:10px;cursor:pointer;font-weight:600;">✕</button></td></tr>`;
       catItems.forEach(desc=>{
         const vals={};
         clientes.forEach(c=>{
@@ -2745,10 +2893,12 @@ function renderPptoIniciales(filtered) {
         clientes.forEach(c=>{
           const v=vals[c]; const eid=`pg_${feria}_${c}_${cat}_${desc}`.replace(/[^a-z0-9]/gi,'_');
           const safeDesc=desc.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+          const sk = `${feria}|${c}`;
+          const lanzado = pptoClienteLanzado?.[sk] || false;
           const cb=hasC?`<button onclick="event.stopPropagation();openMontajeForCell('${feria}','${c}','${cat}','${safeDesc}','${eid}')" title="Calculadora montaje" style="background:none;border:none;cursor:pointer;padding:0;font-size:12px;">🧮</button>`:'';
-          html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;">${cb}<input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0"
-            style="width:80px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#ef4444;font-size:13px;background:transparent;"
-            onfocus="this.style.borderColor='#ef4444';this.style.background='white'" onblur="this.style.borderColor='transparent';this.style.background='transparent'"
+          html+=`<td style="padding:3px 6px;border:1px solid #e5e7eb;text-align:right;"><div style="display:flex;align-items:center;justify-content:flex-end;gap:3px;">${cb}<input type="number" id="${eid}" value="${v||''}" placeholder="0" min="0" ${lanzado?'disabled':''}
+            style="width:80px;text-align:right;border:1px solid transparent;border-radius:4px;padding:3px 5px;color:#ef4444;font-size:13px;background:${lanzado?'#f3f4f6':'transparent'};opacity:${lanzado?'0.6':'1'};cursor:${lanzado?'not-allowed':'text'};"
+            onfocus="if(!this.disabled)this.style.borderColor='#ef4444';if(!this.disabled)this.style.background='white'" onblur="if(!this.disabled)this.style.borderColor='transparent';if(!this.disabled)this.style.background='transparent'"
             onchange="updatePptoCelda('${feria}','${c}','GASTO','${cat}','${desc.replace(/'/g,"\\'")}',this.value)"/></div></td>`;
         });
         html+=`<td style="padding:6px 10px;border:1px solid #e5e7eb;text-align:right;font-weight:700;color:#ef4444;">-${fmt(rowT)}</td><td style="border:1px solid #e5e7eb;"></td></tr>`;
@@ -2757,6 +2907,13 @@ function renderPptoIniciales(filtered) {
     // Siempre sumar catTotals al total general (una sola vez, fuera del if/else)
     clientes.forEach(c=>{totGasto[c]+=catTotals[c];});
   });
+  } else {
+    // Si GASTOS está colapsado, aún así calcular totales
+    budgetsFeria.filter(b=>b.tipo&&!b.tipo.includes('INGRESO')).forEach(b=>{
+      const c=b.cliente;
+      if(totGasto[c]!==undefined) totGasto[c]+=Math.abs(parseFloat(b.importe)||0);
+    });
+  }
 
   // ─ TOTALES ─
   const tI=clientes.reduce((s,c)=>s+totIng[c],0), tG=clientes.reduce((s,c)=>s+totGasto[c],0);
@@ -3082,6 +3239,139 @@ function archivarCliente(feria, cliente, archivado) {
 
   // TODO: Guardar en Firestore
   applyPptoFilters();
+}
+
+// Abrir modal para lanzar presupuestos
+function openLanzarPresupuestoModal() {
+  const feria = Array.from(pptoSelFerias)[0];
+  if (!feria) {
+    alert('Selecciona una Feria primero');
+    return;
+  }
+
+  const budgetsFeria = allBudgets.filter(b => b.feria === feria && b.cliente !== 'TOTAL');
+  const clientes = [...new Set(budgetsFeria.map(b => b.cliente).filter(Boolean))].sort();
+
+  const disponibles = clientes.filter(c => {
+    const sk = `${feria}|${c}`;
+    return !pptoClienteLanzado[sk];
+  });
+
+  if (disponibles.length === 0) {
+    alert('Todos los presupuestos de esta feria ya están lanzados');
+    return;
+  }
+
+  const modal = document.createElement('div');
+  modal.id = 'lanzarModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:450px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);max-height:80vh;overflow-y:auto;';
+
+  let html = `
+    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">🚀 Lanzar Presupuesto</h3>
+    <p style="margin:0 0 12px 0;color:#6b7280;font-size:14px;">Selecciona los presupuestos a lanzar en <strong>${feria}</strong></p>
+    <p style="margin:0 0 16px 0;color:#f59e0b;font-size:12px;background:rgba(245,158,11,0.1);padding:8px 12px;border-radius:4px;border-left:3px solid #f59e0b;">⚠️ Una vez lanzado, el presupuesto quedará bloqueado y no se podrá editar hasta desbloquear manualmente.</p>
+    <div style="margin-bottom:16px;">
+  `;
+
+  disponibles.forEach(c => {
+    const sk = `${feria}|${c}`;
+    const est = pptoClienteStatus[sk] || 'PENDIENTE_ENVIO';
+    html += `
+      <div style="padding:12px;background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;margin-bottom:8px;display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="chk_${c}" value="${c}" style="cursor:pointer;">
+        <div style="flex:1;">
+          <div style="font-weight:600;color:#1f2937;">${c}</div>
+          <div style="font-size:12px;color:#6b7280;">Estado: ${est}</div>
+        </div>
+      </div>
+    `;
+  });
+
+  html += `
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('lanzarModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+      <button onclick="confirmarLanzarPresupuestos('${feria}')" style="padding:8px 16px;background:#e3a017;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Lanzar Seleccionados</button>
+    </div>
+  `;
+
+  content.innerHTML = html;
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+}
+
+function confirmarLanzarPresupuestos(feria) {
+  const checkboxes = document.querySelectorAll('#lanzarModal input[type="checkbox"]:checked');
+  if (checkboxes.length === 0) {
+    alert('Selecciona al menos un presupuesto');
+    return;
+  }
+
+  let confirmMsg = 'Se lanzarán los siguientes presupuestos:\n\n';
+  checkboxes.forEach(cb => {
+    confirmMsg += '• ' + cb.value + '\n';
+  });
+  confirmMsg += '\n¿Estás seguro? Esto bloqueará los presupuestos iniciales.';
+
+  if (!confirm(confirmMsg)) return;
+
+  checkboxes.forEach(cb => {
+    lanzarPresupuesto(feria, cb.value);
+  });
+
+  document.getElementById('lanzarModal').remove();
+  applyPptoFilters();
+}
+
+function lanzarPresupuesto(feria, cliente) {
+  const statusKey = `${feria}|${cliente}`;
+  pptoClienteLanzado[statusKey] = true;
+  localStorage.setItem('pptoClienteLanzado_' + statusKey, 'true');
+  console.log(`✓ Presupuesto lanzado: ${cliente} (${feria})`);
+}
+
+// Abrir modal para desbloquear presupuesto
+function abrirDesbloquearModal(feria, cliente) {
+  const statusKey = `${feria}|${cliente}`;
+  const modal = document.createElement('div');
+  modal.id = 'desbloquearModal';
+  modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000;';
+
+  const content = document.createElement('div');
+  content.style.cssText = 'background:white;border-radius:8px;padding:24px;max-width:400px;width:90%;box-shadow:0 4px 6px rgba(0,0,0,0.1);';
+
+  content.innerHTML = `
+    <h3 style="margin:0 0 16px 0;color:#1f2937;font-size:18px;font-weight:600;">🔓 Desbloquear Presupuesto</h3>
+    <p style="margin:0 0 16px 0;color:#6b7280;font-size:14px;">Para desbloquear <strong>${cliente}</strong>, escribe exactamente:</p>
+    <p style="text-align:center;font-weight:700;color:#ef4444;font-size:14px;background:rgba(239,68,68,0.1);padding:8px;border-radius:4px;margin-bottom:16px;">DESBLOQUEAR</p>
+    <input id="desbloquearInput" type="text" placeholder="Escribe aquí..." style="width:100%;padding:8px 12px;border:1px solid #e5e7eb;border-radius:6px;font-size:14px;box-sizing:border-box;margin-bottom:16px;">
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button onclick="document.getElementById('desbloquearModal').remove()" style="padding:8px 16px;background:#e5e7eb;color:#374151;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Cancelar</button>
+      <button onclick="desbloquearPresupuesto('${feria}','${cliente}')" style="padding:8px 16px;background:#10b981;color:white;border:none;border-radius:6px;cursor:pointer;font-weight:600;">Desbloquear</button>
+    </div>
+  `;
+
+  modal.appendChild(content);
+  document.body.appendChild(modal);
+  document.getElementById('desbloquearInput').focus();
+}
+
+function desbloquearPresupuesto(feria, cliente) {
+  const input = document.getElementById('desbloquearInput').value.trim();
+  if (input !== 'DESBLOQUEAR') {
+    alert('❌ Texto incorrecto. Intenta de nuevo.');
+    return;
+  }
+
+  const statusKey = `${feria}|${cliente}`;
+  pptoClienteLanzado[statusKey] = false;
+  localStorage.setItem('pptoClienteLanzado_' + statusKey, 'false');
+  document.getElementById('desbloquearModal').remove();
+  applyPptoFilters();
+  alert('✓ Presupuesto desbloqueado correctamente');
 }
 
 // Agregar cliente a la feria
@@ -4299,3 +4589,4 @@ function saveMontajeValue() {
 
 </body>
 </html>
+<!-- VERSION: 2.4.1 - Collapsed INGRESOS/GASTOS, decimal display, launch/unlock functionality -->
