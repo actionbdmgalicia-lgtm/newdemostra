@@ -7673,7 +7673,7 @@ const PRESUPUESTOS_2026 = [
 ];
 
 async function importarPresupuestos2026() {
-  if (!auth.currentUser) {
+  if (!currentUser) {
     alert('❌ No estás autenticado');
     return;
   }
