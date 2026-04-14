@@ -2799,12 +2799,12 @@ function renderPptoIniciales(filtered) {
     const EC = {PENDIENTE_ENVIO:'#f59e0b',ACEPTADO:'#10b981',RECHAZADO:'#ef4444'};
     const EL = {PENDIENTE_ENVIO:'Pendiente ENVIO',ACEPTADO:'Aceptado',RECHAZADO:'Rechazado'};
     html += `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;">
-      <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}${lanzado?' 🔒':''}​</div>
+      <div style="background:${EC[est]}20;color:${EC[est]};padding:2px 5px;border-radius:4px;font-size:10px;font-weight:700;margin-bottom:3px;white-space:nowrap;">${EL[est]}${lanzado?' 🔒':''}</div>
       <div style="display:flex;gap:3px;justify-content:center;flex-wrap:wrap;font-size:9px;">
         <button onclick="editarEstadoCliente('${feria}','${c}')" style="padding:2px 5px;background:#3b82f6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Estado</button>
         <button onclick="editarNombreCliente('${feria}','${c}')" style="padding:2px 5px;background:#8b5cf6;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">Nombre</button>
         <button onclick="archivarCliente('${feria}','${c}',${arch})" style="padding:2px 5px;background:${arch?'#10b981':'#9ca3af'};color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">${arch?'Desarchiv':'Archiv'}</button>
-        ${lanzado?`<button onclick="abrirDesbloquearModal('${feria}','${c}')" style="padding:2px 5px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">🔓 Desbl</button>`:''​}
+        ${lanzado?`<button onclick="abrirDesbloquearModal('${feria}','${c}')" style="padding:2px 5px;background:#ef4444;color:white;border:none;border-radius:3px;cursor:pointer;font-size:9px;">🔓 Desbl</button>`:''}
       </div>
     </td>`;
   });
