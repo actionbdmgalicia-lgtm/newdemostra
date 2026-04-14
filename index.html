@@ -865,6 +865,14 @@ tr:hover { background:#f3f4f6; }
     <div id="admin-page" class="page-section">
       <h2 style="font-size:18px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:24px;color:#1f2937;">Panel Administrativo</h2>
 
+      <div class="card" style="background:#e0f2fe;border-left:4px solid #0284c7;">
+        <div class="card-header"><h2>📥 Importar Presupuestos 2026</h2></div>
+        <div class="card-body">
+          <p style="margin-bottom:16px;color:#0c4a6e;"><strong>Importar 767 presupuestos desde Excel:</strong> 6 ferias (EZPELETA, ALIMENTARIA, SEAFOOD, NAVALIA, ONIVIA, STONEGAL)</p>
+          <button class="btn btn-primary" onclick="if(confirm('¿Importar todos los presupuestos 2026? Esto puede tomar unos segundos...')) importarPresupuestos2026()" style="background:#0284c7;">Importar Presupuestos 2026</button>
+        </div>
+      </div>
+
       <div class="card">
         <div class="card-header"><h2>Crear Nuevo Usuario</h2></div>
         <div class="card-body">
@@ -4531,6 +4539,7 @@ function saveMontajeValue() {
 
 <!-- IMPORT PRESUPUESTOS SCRIPT -->
 <script src="import-presupuestos.js"></script>
+<script src="import-presupuestos-2026.js"></script>
 
 <!-- MODAL MONTAJE CALCULATOR -->
 <div id="montajeModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;justify-content:center;align-items:center;padding:20px;">
