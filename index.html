@@ -1269,8 +1269,10 @@ firebase.auth().onAuthStateChanged(user => {
   }
 });
 
+const ADMIN_EMAILS = ['demostra@demostra.com', 'actionbdmgalicia@gmail.com', 'actionbdm@gmail.com', 'admin@demostra.com'];
+
 function checkAdminStatus() {
-  if (currentUser?.email === 'demostra@demostra.com') {
+  if (currentUser && ADMIN_EMAILS.includes(currentUser.email)) {
     isAdmin = true;
     document.getElementById('adminBtn').style.display = '';
   }
